@@ -1,0 +1,366 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,sans-serif);background:transparent;color:var(--color-text-primary);font-size:13px}
+.wrap{padding:10px 8px 28px}
+
+.layer-label{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-tertiary);text-align:center;margin:6px 0 4px}
+.hline{border:none;border-top:.5px solid var(--color-border-tertiary);margin:0 0 6px}
+
+.row{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:4px 0}
+.conn-vert{display:flex;justify-content:center;height:14px}
+.conn-vert span{width:0;border-left:1px solid var(--color-border-secondary)}
+
+/* root */
+.root-box{padding:9px 24px;border-radius:12px;font-size:14px;font-weight:500;border:1.5px solid var(--color-border-primary);background:var(--color-background-secondary);cursor:pointer;transition:opacity .15s}
+.root-box:hover{opacity:.8}
+
+/* foundation nodes */
+.fn{padding:5px 9px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;text-align:center;min-width:74px;transition:opacity .15s;line-height:1.3}
+.fn:hover{opacity:.8}
+.fn-life{background:#E1F5EE;color:#085041;border:.5px solid #0F6E56}
+.fn-pharm{background:#EEEDFE;color:#26215C;border:.5px solid #534AB7}
+.fn-chem{background:#FAEEDA;color:#412402;border:.5px solid #854F0B}
+.fn-pk{background:#FAECE7;color:#4A1B0C;border:.5px solid #993C1D}
+.fn-phx{background:#E6F1FB;color:#042C53;border:.5px solid #185FA5}
+@media(prefers-color-scheme:dark){
+  .fn-life{background:#04342C;color:#9FE1CB;border-color:#1D9E75}
+  .fn-pharm{background:#26215C;color:#CECBF6;border-color:#7F77DD}
+  .fn-chem{background:#412402;color:#FAC775;border-color:#BA7517}
+  .fn-pk{background:#4A1B0C;color:#F5C4B3;border-color:#D85A30}
+  .fn-phx{background:#042C53;color:#B5D4F4;border-color:#378ADD}
+}
+
+/* bridge nodes */
+.bridge-row{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:4px 0;position:relative}
+.bn{padding:4px 9px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:.5px solid;transition:all .15s}
+.bn:hover{opacity:.8}
+.bn-r{background:#FCEBEB;color:#A32D2D;border-color:#E24B4A}
+.bn-p{background:#EEEDFE;color:#3C3489;border-color:#7F77DD}
+.bn-t{background:#E1F5EE;color:#0F6E56;border-color:#1D9E75}
+.bn-a{background:#FAEEDA;color:#633806;border-color:#EF9F27}
+.bn-g{background:#EAF3DE;color:#27500A;border-color:#639922}
+.bn-b{background:#E6F1FB;color:#0C447C;border-color:#378ADD}
+@media(prefers-color-scheme:dark){
+  .bn-r{background:#501313;color:#F7C1C1;border-color:#E24B4A}
+  .bn-p{background:#26215C;color:#CECBF6;border-color:#7F77DD}
+  .bn-t{background:#04342C;color:#9FE1CB;border-color:#1D9E75}
+  .bn-a{background:#412402;color:#FAC775;border-color:#EF9F27}
+  .bn-g{background:#173404;color:#C0DD97;border-color:#639922}
+  .bn-b{background:#042C53;color:#B5D4F4;border-color:#378ADD}
+}
+
+/* system grid */
+.sys-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:4px 0}
+.sys-block{border:.5px solid var(--color-border-tertiary);border-radius:9px;overflow:hidden;background:var(--color-background-primary)}
+.sys-hdr{font-size:10px;font-weight:500;padding:4px 7px;color:var(--color-text-secondary);background:var(--color-background-secondary);border-bottom:.5px solid var(--color-border-tertiary);text-align:center}
+.sys-row{font-size:10px;padding:3px 7px;color:var(--color-text-secondary);border-bottom:.5px solid var(--color-border-tertiary);cursor:pointer;transition:background .1s;display:flex;align-items:center;gap:3px}
+.sys-row:last-child{border-bottom:none}
+.sys-row:hover{background:var(--color-background-secondary)}
+.ta{font-size:9px;padding:1px 4px;border-radius:3px;background:#E6F1FB;color:#185FA5;font-weight:500;flex-shrink:0}
+.tb{font-size:9px;padding:1px 4px;border-radius:3px;background:#E1F5EE;color:#0F6E56;font-weight:500;flex-shrink:0}
+@media(prefers-color-scheme:dark){.ta{background:#042C53;color:#85B7EB}.tb{background:#04342C;color:#5DCAA5}}
+
+/* service nodes */
+.svc{padding:5px 9px;border-radius:8px;font-size:11px;cursor:pointer;border:.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-secondary);transition:background .1s}
+.svc:hover{background:var(--color-background-tertiary)}
+
+/* network section */
+.net-wrap{margin:10px 0 0;border:.5px solid var(--color-border-tertiary);border-radius:10px;overflow:hidden}
+.net-tabs{display:flex;border-bottom:.5px solid var(--color-border-tertiary)}
+.net-tab{flex:1;padding:7px 4px;font-size:11px;font-weight:500;text-align:center;cursor:pointer;color:var(--color-text-tertiary);background:var(--color-background-secondary);border:none;transition:all .15s;border-right:.5px solid var(--color-border-tertiary)}
+.net-tab:last-child{border-right:none}
+.net-tab.active{color:var(--color-text-primary);background:var(--color-background-primary)}
+.net-body{padding:10px 12px;min-height:120px}
+.net-section{display:none}
+.net-section.show{display:block}
+.net-group{margin-bottom:10px}
+.net-src{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:5px}
+.net-targets{display:flex;flex-wrap:wrap;gap:4px}
+.net-arrow{font-size:10px;color:var(--color-text-tertiary);margin:0 1px}
+.net-target{font-size:10px;padding:2px 7px;border-radius:5px;background:var(--color-background-secondary);border:.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);cursor:pointer;transition:background .1s}
+.net-target:hover{background:var(--color-background-tertiary)}
+
+/* legend */
+.legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.leg{font-size:10px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:3px}
+.leg-pill{display:inline-block;width:18px;height:10px;border-radius:5px}
+.leg-dot{display:inline-block;width:18px;height:0;border-top:2px dotted var(--color-text-tertiary)}
+</style>
+
+<div class="wrap">
+
+<div class="row"><div class="root-box" onclick="sendPrompt('解释药学知识拓扑图')">药学知识拓扑图</div></div>
+<div class="conn-vert"><span></span></div>
+
+<div class="layer-label">基础层 — 第一性原理</div>
+<hr class="hline">
+<div class="row">
+  <div class="fn fn-life" onclick="sendPrompt('生命药学提供哪些人体生理基础，如何支撑各系统药物学习？')">生命药学<br><span style="font-size:9px;font-weight:400">人体基础</span></div>
+  <div class="fn fn-pharm" onclick="sendPrompt('药理毒理学的核心框架是什么？为什么它是所有药物的推导起点？')">药理毒理学<br><span style="font-size:9px;font-weight:400">作用规律</span></div>
+  <div class="fn fn-chem" onclick="sendPrompt('药物化学的构效关系如何决定药物的作用靶点选择？')">药物化学<br><span style="font-size:9px;font-weight:400">结构本源</span></div>
+  <div class="fn fn-pk" onclick="sendPrompt('药物动力学ADME四过程如何影响临床给药方案？')">药物动力学<br><span style="font-size:9px;font-weight:400">ADME</span></div>
+  <div class="fn fn-phx" onclick="sendPrompt('药剂学的剂型设计如何影响药物的吸收和疗效？')">药剂学<br><span style="font-size:9px;font-weight:400">剂型载体</span></div>
+</div>
+
+<div class="conn-vert"><span></span></div>
+
+<div class="layer-label">桥接节点层 — 分子靶点</div>
+<hr class="hline">
+<div class="bridge-row">
+  <div class="bn bn-r" onclick="sendPrompt('受体作为药物靶点的分类有哪些？激动剂和拮抗剂的区别？')">受体</div>
+  <div class="bn bn-p" onclick="sendPrompt('酶抑制剂类药物的作用机制？举例说明竞争性与非竞争性抑制。')">酶</div>
+  <div class="bn bn-t" onclick="sendPrompt('离子通道类药物有哪些？钙通道阻滞剂和钠通道阻滞剂分别对应哪些药物？')">离子通道</div>
+  <div class="bn bn-a" onclick="sendPrompt('转运体作为药物靶点的机制？以SSRI和SGLT2抑制剂为例说明。')">转运体</div>
+  <div class="bn bn-g" onclick="sendPrompt('激素类药物和内分泌调节药物的靶点机制是什么？')">激素</div>
+  <div class="bn bn-b" onclick="sendPrompt('病原体作为药物靶点：抗菌药物、抗病毒药物的靶点各是什么？')">病原体</div>
+</div>
+
+<div class="conn-vert"><span></span></div>
+
+<div class="layer-label">药物系统层 — 按生理系统分区</div>
+<hr class="hline">
+<div class="sys-grid">
+  <div class="sys-block">
+    <div class="sys-hdr">神经调控系统</div>
+    <div class="sys-row" onclick="sendPrompt('精神与中枢神经系统用药的核心知识点，以及受体靶点分类')"><span class="ta">A1</span>精神与中枢神经用药</div>
+    <div class="sys-row" onclick="sendPrompt('神经系统常见疾病诊断要点')"><span class="tb">B10</span>神经系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">呼吸系统</div>
+    <div class="sys-row" onclick="sendPrompt('呼吸系统用药的靶点和分类核心知识点')"><span class="ta">A3</span>呼吸系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('呼吸系统常见疾病：哮喘、COPD的诊断与管理')"><span class="tb">B8</span>呼吸系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">消化系统</div>
+    <div class="sys-row" onclick="sendPrompt('消化系统用药的受体靶点与分类')"><span class="ta">A4</span>消化系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('消化系统常见疾病的诊断要点')"><span class="tb">B11</span>消化系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">心血管循环系统</div>
+    <div class="sys-row" onclick="sendPrompt('心血管系统用药：离子通道和受体靶点分类')"><span class="ta">A5</span>心血管系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('血液系统用药：抗凝、溶栓、抗血小板的靶点机制')"><span class="ta">A6</span>血液系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('心血管系统常见疾病诊断与管理')"><span class="tb">B9</span>心血管系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">泌尿-水盐平衡</div>
+    <div class="sys-row" onclick="sendPrompt('泌尿系统用药的靶点与分类')"><span class="ta">A7</span>泌尿系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('水电解质酸碱平衡与营养用药的核心知识')"><span class="ta">A11</span>水电解质营养用药</div>
+    <div class="sys-row" onclick="sendPrompt('泌尿系统常见疾病诊断要点')"><span class="tb">B14</span>泌尿系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">内分泌代谢系统</div>
+    <div class="sys-row" onclick="sendPrompt('内分泌系统用药：激素和转运体靶点分类')"><span class="ta">A8</span>内分泌系统用药</div>
+    <div class="sys-row" onclick="sendPrompt('内分泌系统常见疾病诊断要点：糖尿病、甲亢等')"><span class="tb">B12</span>内分泌系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">炎症免疫系统</div>
+    <div class="sys-row" onclick="sendPrompt('解热镇痛抗炎抗风湿及抗痛风药的靶点与分类')"><span class="ta">A2</span>解热镇痛抗炎抗风湿</div>
+    <div class="sys-row" onclick="sendPrompt('抗感染药物的靶点：细菌、病毒、真菌各自靶点是什么？')"><span class="ta">A9</span>抗感染药物</div>
+    <div class="sys-row" onclick="sendPrompt('皮肤用药及抗过敏用药的靶点与分类')"><span class="ta">A13</span>皮肤用药及抗过敏</div>
+    <div class="sys-row" onclick="sendPrompt('免疫系统常见疾病诊断要点')"><span class="tb">B13</span>免疫系统常见疾病</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">肿瘤系统</div>
+    <div class="sys-row" onclick="sendPrompt('抗肿瘤药的靶点分类：细胞毒类、靶向类、免疫类')"><span class="ta">A10</span>抗肿瘤药</div>
+    <div class="sys-row" onclick="sendPrompt('肿瘤B15的药学相关知识点')"><span class="tb">B15</span>肿瘤</div>
+  </div>
+  <div class="sys-block">
+    <div class="sys-hdr">专科局部系统</div>
+    <div class="sys-row" onclick="sendPrompt('眼科耳鼻喉口腔用药的分类与核心知识点')"><span class="ta">A12</span>眼科耳鼻喉口腔用药</div>
+  </div>
+</div>
+
+<div class="conn-vert"><span></span></div>
+
+<div class="layer-label">药学服务应用层</div>
+<hr class="hline">
+<div class="row">
+  <div class="svc" onclick="sendPrompt('药学服务与药品管理B1核心知识点')">B1 药学服务与药品管理</div>
+  <div class="svc" onclick="sendPrompt('处方审核与调剂B2核心知识点')">B2 处方审核与调剂</div>
+  <div class="svc" onclick="sendPrompt('用药咨询与药物治疗管理B3核心知识点')">B3 用药咨询与治疗管理</div>
+  <div class="svc" onclick="sendPrompt('用药安全B4核心知识点')">B4 用药安全</div>
+  <div class="svc" onclick="sendPrompt('急救中毒解救及职业防护B5核心知识点')">B5 急救与中毒解救</div>
+  <div class="svc" onclick="sendPrompt('常见病症健康管理B6核心知识点')">B6 常见病症健康管理</div>
+  <div class="svc" onclick="sendPrompt('慢性病管理B7核心知识点')">B7 慢性病管理</div>
+</div>
+
+<div class="net-wrap">
+  <div class="net-tabs">
+    <button class="net-tab active" onclick="showNet('bridge')">桥接节点→药物</button>
+    <button class="net-tab" onclick="showNet('found')">基础层→服务层</button>
+    <button class="net-tab" onclick="showNet('cross')">跨系统疾病关联</button>
+    <button class="net-tab" onclick="showNet('chain')">推导链路</button>
+  </div>
+  <div class="net-body">
+
+    <div class="net-section show" id="net-bridge">
+      <div class="net-group">
+        <div class="net-src">受体 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('精神与中枢神经系统用药通过哪些受体类型发挥作用？')">A1 精神中枢神经</span>
+          <span class="net-target" onclick="sendPrompt('心血管系统用药中受体拮抗剂有哪些？β受体、α受体各举例')">A5 心血管</span>
+          <span class="net-target" onclick="sendPrompt('消化系统用药通过哪些受体靶点？H2受体、M受体举例')">A4 消化系统</span>
+          <span class="net-target" onclick="sendPrompt('呼吸系统用药的受体靶点：β2受体激动剂、M受体拮抗剂')">A3 呼吸系统</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">酶 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('ACE抑制剂和ARB的靶点和区别，在心血管疾病中的应用')">A5 心血管</span>
+          <span class="net-target" onclick="sendPrompt('抗感染药物中以酶为靶点的代表药物：β-内酰胺酶、DNA旋转酶')">A9 抗感染</span>
+          <span class="net-target" onclick="sendPrompt('解热镇痛药COX酶抑制的机制，选择性与非选择性COX抑制剂区别')">A2 解热镇痛</span>
+          <span class="net-target" onclick="sendPrompt('抗肿瘤药物中以酶为靶点的有哪些？拓扑异构酶抑制剂举例')">A10 抗肿瘤</span>
+          <span class="net-target" onclick="sendPrompt('内分泌系统用药中酶抑制剂：DPP-4抑制剂、芳香化酶抑制剂')">A8 内分泌</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">离子通道 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('钙通道阻滞剂有哪些分类？在心血管疾病中如何应用？')">A5 心血管</span>
+          <span class="net-target" onclick="sendPrompt('钠通道阻滞剂作为局麻药和抗心律失常药的作用机制')">A1 精神中枢神经</span>
+          <span class="net-target" onclick="sendPrompt('利尿药中离子通道和转运体靶点：髓袢利尿剂、噻嗪类的机制区别')">A7 泌尿系统</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">转运体 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('SSRI类抗抑郁药的转运体靶点机制，与TCA的区别')">A1 精神中枢神经</span>
+          <span class="net-target" onclick="sendPrompt('SGLT2抑制剂的转运体机制，在糖尿病和心血管病中的双重作用')">A8 内分泌</span>
+          <span class="net-target" onclick="sendPrompt('泌尿系统中转运体靶点药物，肾小管转运体在尿酸排泄中的作用')">A7 泌尿系统</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">激素 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('胰岛素、糖皮质激素、甲状腺激素类药物的靶点与应用')">A8 内分泌</span>
+          <span class="net-target" onclick="sendPrompt('糖皮质激素在炎症免疫系统疾病中的应用')">A2 解热镇痛抗炎</span>
+          <span class="net-target" onclick="sendPrompt('性激素类药物在抗肿瘤中的作用机制')">A10 抗肿瘤</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">病原体 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('抗菌药物靶点总结：细胞壁、蛋白质合成、核酸合成、细胞膜各类药物')">A9 抗感染</span>
+          <span class="net-target" onclick="sendPrompt('抗病毒药物靶点：逆转录酶、蛋白酶、神经氨酸酶抑制剂举例')">A9 抗感染</span>
+          <span class="net-target" onclick="sendPrompt('抗真菌药物靶点：麦角固醇合成途径相关药物')">A9 抗感染</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="net-section" id="net-found">
+      <div class="net-group">
+        <div class="net-src">药理毒理学 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('药理毒理学知识如何直接支撑用药安全B4？药物不良反应的分类与监测')">B4 用药安全</span>
+          <span class="net-target" onclick="sendPrompt('药理毒理学在急救和中毒解救B5中的应用：毒理学基础与解毒机制')">B5 急救解救</span>
+          <span class="net-target" onclick="sendPrompt('药理毒理学如何支撑用药咨询B3？药效学在治疗方案设计中的应用')">B3 用药咨询</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">药物动力学 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('药动学参数如何指导处方审核B2？半衰期、Cmax、AUC的临床意义')">B2 处方审核</span>
+          <span class="net-target" onclick="sendPrompt('药动学在用药咨询B3中的应用：给药间隔、剂量调整、肝肾功能影响')">B3 用药咨询</span>
+          <span class="net-target" onclick="sendPrompt('药动学与用药安全B4：TDM治疗药物监测的适应症和意义')">B4 用药安全</span>
+          <span class="net-target" onclick="sendPrompt('药动学与慢性病管理B7：长期用药的药动学变化与剂量调整')">B7 慢性病管理</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">药剂学 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('药剂学知识在药学服务与药品管理B1中的应用：贮藏、有效期、制剂稳定性')">B1 药学服务管理</span>
+          <span class="net-target" onclick="sendPrompt('药剂学在处方审核调剂B2中的应用：配伍禁忌、制剂相容性')">B2 处方审核</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">生命药学 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('生理学基础在慢性病管理B7中的应用：疾病病理生理与用药个体化')">B7 慢性病管理</span>
+          <span class="net-target" onclick="sendPrompt('人体生理基础在常见病症健康管理B6中的应用')">B6 健康管理</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="net-section" id="net-cross">
+      <div class="net-group">
+        <div class="net-src">A9 抗感染药物 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('抗感染药物在呼吸系统疾病B8中的应用：肺炎、支气管炎的选药原则')">B8 呼吸系统疾病</span>
+          <span class="net-target" onclick="sendPrompt('抗感染药物在泌尿系统疾病B14中的应用：UTI的用药选择')">B14 泌尿系统疾病</span>
+          <span class="net-target" onclick="sendPrompt('抗感染药物在免疫系统疾病B13中的应用：感染诱发免疫反应的处理')">B13 免疫系统疾病</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">A5 心血管 + A8 内分泌 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('高血压、糖尿病、高脂血症慢性病三联管理：B7慢性病管理核心内容')">B7 慢性病管理</span>
+          <span class="net-target" onclick="sendPrompt('心血管疾病B9与内分泌疾病B12的共病管理：代谢综合征的用药策略')">B9+B12 共病</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">A2 解热镇痛 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('NSAIDs在免疫系统疾病B13中的应用：类风湿关节炎、系统性红斑狼疮')">B13 免疫系统疾病</span>
+          <span class="net-target" onclick="sendPrompt('解热镇痛药在常见病症健康管理B6中的应用：发热、疼痛的OTC用药')">B6 健康管理</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">A10 抗肿瘤 ⋯</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('抗肿瘤药物毒性与急救B5：化疗外渗、严重不良反应的处理')">B5 急救解救</span>
+          <span class="net-target" onclick="sendPrompt('抗肿瘤药物在用药安全B4中的特殊管理：高警示药品管理')">B4 用药安全</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="net-section" id="net-chain">
+      <div class="net-group">
+        <div class="net-src" style="font-size:12px;margin-bottom:8px">完整推导链路（点击任意节点）</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+          <span class="net-target" onclick="sendPrompt('生命科学基础（解剖生理病理）如何奠定药学知识体系？')">生命科学</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('疾病机制如何从生理基础推导出来？举例说明高血压的病理生理')">疾病机制</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('从疾病机制如何确定药物靶点？以受体、酶、离子通道、转运体为例')">靶点发现</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('药物化学构效关系如何从靶点出发设计药物分子？')">药物设计</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('药理作用、药动学参数如何决定药物的临床地位？')">药理作用</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('临床治疗方案如何从药理知识推导？选药、联用、禁忌的逻辑')">临床治疗</span>
+          <span style="color:var(--color-text-tertiary);font-size:12px">→</span>
+          <span class="net-target" onclick="sendPrompt('药学服务如何将所有药学知识转化为患者用药安全保障？')">药学服务</span>
+        </div>
+      </div>
+      <div class="net-group">
+        <div class="net-src">V2 新增：桥接节点如何闭合推导链</div>
+        <div class="net-targets">
+          <span class="net-target" onclick="sendPrompt('为什么加入受体/酶/离子通道/转运体/激素/病原体这一层？它在知识体系中起什么作用？')">为什么需要桥接层？↗</span>
+          <span class="net-target" onclick="sendPrompt('以β受体为例，完整推导：生理功能→疾病机制→靶点选择→β受体拮抗剂→临床应用→药学服务')">β受体完整推导链↗</span>
+          <span class="net-target" onclick="sendPrompt('以ACE酶为例，完整推导：RAAS系统→高血压机制→ACE靶点→ACEI药物→临床应用')">ACE完整推导链↗</span>
+          <span class="net-target" onclick="sendPrompt('以细菌细胞壁合成为例，完整推导：病原体靶点→β-内酰胺类药物→临床抗感染应用')">细菌靶点推导链↗</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="legend">
+  <div class="leg"><span class="leg-pill" style="background:#E6F1FB;border:.5px solid #185FA5"></span> 药物（A类）</div>
+  <div class="leg"><span class="leg-pill" style="background:#E1F5EE;border:.5px solid #0F6E56"></span> 疾病（B类）</div>
+  <div class="leg"><span class="leg-pill" style="background:#FCEBEB;border:.5px solid #E24B4A;border-radius:10px"></span> 靶点桥接层</div>
+  <div class="leg"><span class="leg-dot"></span> 网状关联边</div>
+</div>
+
+</div>
+
+<script>
+function showNet(id){
+  document.querySelectorAll('.net-section').forEach(s=>s.classList.remove('show'));
+  document.querySelectorAll('.net-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('net-'+id).classList.add('show');
+  event.target.classList.add('active');
+}
+</script>

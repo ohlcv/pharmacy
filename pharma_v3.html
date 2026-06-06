@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>药学知识拓扑图</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6f8;
+  --surface:#ffffff;
+  --border:#e2e8f0;
+  --text-primary:#1a202c;
+  --text-secondary:#64748b;
+  --text-muted:#94a3b8;
+  --accent:#0F6E56;
+}
+body{
+  font-family:'Noto Sans SC','DM Sans',sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+#app{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  width:100%;
+  margin:0 auto;
+}
+
+/* ── Header ── */
+#header{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:12px 16px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+#header-left{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  text-align:center;
+}
+#header-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-primary);
+  letter-spacing:-0.02em;
+}
+#header-sub{
+  font-size:11px;
+  color:var(--text-muted);
+}
+
+#controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* ── Canvas area ── */
+#canvas-wrap{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background:var(--surface);
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+/* ── Info panel (follows mouse) ── */
+#info-panel{
+  position:absolute;
+  width:220px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px 14px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+  pointer-events:none;
+  transition:opacity 0.15s;
+  opacity:0;
+  z-index:100;
+}
+#info-panel.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+#info-panel-name{
+  font-size:14px;
+  font-weight:700;
+  color:var(--text-primary);
+  margin-bottom:4px;
+}
+#info-panel-code{
+  display:inline-block;
+  font-size:10px;
+  font-weight:600;
+  padding:2px 8px;
+  border-radius:4px;
+  margin-bottom:8px;
+}
+#info-panel-desc{
+  font-size:12px;
+  line-height:1.7;
+  color:var(--text-secondary);
+  margin-bottom:10px;
+}
+#info-panel-links{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.link-row{
+  font-size:11px;
+  color:var(--text-muted);
+}
+.link-row span{
+  font-weight:600;
+  color:var(--text-secondary);
+  margin-right:4px;
+}
+.link-tag{
+  display:inline-block;
+  background:var(--bg);
+  border-radius:4px;
+  padding:1px 6px;
+  margin:1px 2px 1px 0;
+  font-size:10px;
+  color:var(--text-secondary);
+}
+#info-panel-hint{
+  margin-top:8px;
+  font-size:10px;
+  color:var(--text-muted);
+  text-align:center;
+}
+
+/* ── Legend (horizontal in canvas) ── */
+#legend-wrap{
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:5;
+}
+#legend{
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  backdrop-filter:blur(4px);
+  white-space:nowrap;
+  opacity:0;
+  visibility:hidden;
+  transform:translateX(8px);
+  transition:all 0.2s ease;
+}
+#legend-wrap:hover #legend{
+  opacity:1;
+  visibility:visible;
+  transform:translateX(0);
+}
+#legend-toggle{
+  width:24px;
+  height:24px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.8);
+  border:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all 0.15s;
+}
+#legend-toggle:hover{
+  background:rgba(255,255,255,1);
+  border-color:var(--accent);
+}
+#legend-toggle svg{
+  width:12px;
+  height:12px;
+  color:var(--text-muted);
+}
+.leg{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:10px;
+  color:var(--text-secondary);
+}
+.leg-dot{
+  width:10px;height:10px;
+  border-radius:50%;
+  border:1.5px solid;
+  flex-shrink:0;
+}
+
+/* ── Hint overlay ── */
+#hint-bar{
+  position:absolute;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(26,32,44,0.75);
+  color:rgba(255,255,255,0.85);
+  font-size:11px;
+  padding:5px 14px;
+  border-radius:20px;
+  pointer-events:none;
+  white-space:nowrap;
+  backdrop-filter:blur(4px);
+  transition:opacity 0.3s;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="header-left">
+      <div id="header-title">药学知识拓扑图</div>
+      <div id="header-sub">纯四力引擎 · 强力同类聚束 · 电磁力类间组织 · 引力层势阱 · 弱力边界恢复</div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="info-panel">
+      <div id="info-panel-name"></div>
+      <div id="info-panel-code"></div>
+      <div id="info-panel-desc"></div>
+      <div id="info-panel-links"></div>
+      <div id="info-panel-hint">点击节点可锁定 · 再次点击解锁</div>
+    </div>
+    <div id="legend-wrap">
+      <div id="legend-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      </div>
+      <div id="legend">
+        <div class="leg" style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;margin-bottom:2px">— 层 —</div>
+        <div class="leg"><span class="leg-dot" style="background:#00A5B5;border-color:#00A5B5"></span>基础层（foundation）</div>
+        <div class="leg"><span class="leg-dot" style="background:#9C27B0;border-color:#9C27B0"></span>靶点层（bridge）</div>
+        <div class="leg"><span class="leg-dot" style="background:#185FA5;border-color:#185FA5"></span>临床层（clinical）</div>
+        <div class="leg"><span class="leg-dot" style="background:#534AB7;border-color:#534AB7"></span>服务层（service）</div>
+        <div class="leg" style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;margin-top:4px;margin-bottom:2px">— 系统 —</div>
+        <div class="leg"><span class="leg-dot" style="background:#1E40AF;border-color:#1E40AF"></span>神经系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#059669;border-color:#059669"></span>呼吸系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#D97706;border-color:#D97706"></span>消化系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#DC2626;border-color:#DC2626"></span>心血管·内分泌</div>
+        <div class="leg"><span class="leg-dot" style="background:#2563EB;border-color:#2563EB"></span>泌尿系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#CA8A04;border-color:#CA8A04"></span>免疫系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#4B5563;border-color:#4B5563"></span>肿瘤·专科</div>
+      </div>
+    </div>
+    <div id="hint-bar">拖拽节点调整布局 · 滚轮缩放</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════
+const NODE_INFO={
+  '生命药学':{code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
+  '药理毒理学':{code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
+  '药物化学':{code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
+  '药物动力学':{code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
+  '药剂学':{code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
+  '受体':{code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
+  '酶':{code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
+  '离子通道':{code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
+  '转运体':{code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
+  '激素':{code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
+  '病原体':{code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
+  '精神与\n中枢神经用药':{code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
+  '神经系统\n常见疾病':{code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
+  '呼吸系统\n用药':{code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
+  '呼吸系统\n常见疾病':{code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
+  '消化系统\n用药':{code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
+  '消化系统\n常见疾病':{code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
+  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
+  '血液系统\n用药':{code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
+  '心血管系统\n常见疾病':{code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
+  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
+  '内分泌系统\n常见疾病':{code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
+  '泌尿系统\n用药':{code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
+  '水电解质\n营养用药':{code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
+  '泌尿系统\n常见疾病':{code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
+  '抗感染\n药物':{code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
+  '解热镇痛\n抗炎抗风湿':{code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
+  '皮肤用药\n及抗过敏':{code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
+  '免疫系统\n常见疾病':{code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
+  '抗肿瘤\n药物':{code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
+  '肿瘤':{code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
+  '眼科耳鼻喉\n口腔用药':{code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
+  '慢病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
+  '用药安全':{code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
+  '处方审核\n与调剂':{code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
+  '用药咨询\n与治疗管理':{code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
+  '常见病症\n健康管理':{code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
+};
+
+const CATEGORY_COLORS={
+  foundation:{fill:'#E0F4F9',stroke:'#00A5B5',text:'#006B7A'},  // 青色系 - 基础
+  bridge:{fill:'#F3E5F5',stroke:'#9C27B0',text:'#5D1B7A'},        // 紫色系 - 连接
+  neuro: {fill:'#DEE9FA',stroke:'#1E40AF',text:'#0F2774'},        // 深蓝色 - 神经
+  resp:  {fill:'#D1FAE5',stroke:'#059669',text:'#035A42'},        // 翠绿色 - 呼吸
+  digest:{fill:'#FEF3C7',stroke:'#D97706',text:'#92400E'},        // 橙色系 - 消化
+  cardio:{fill:'#FEE2E2',stroke:'#DC2626',text:'#991B1B'},        // 红色系 - 心血管
+  endo:  {fill:'#FCE7F3',stroke:'#DB2777',text:'#9D174D'},        // 紫红色 - 内分泌
+  uro:   {fill:'#DBEAFE',stroke:'#2563EB',text:'#1E40AF'},        // 天蓝色 - 泌尿
+  immuno:{fill:'#FEF9C3',stroke:'#CA8A04',text:'#854D0E'},        // 金黄色 - 免疫
+  onco:  {fill:'#E5E7EB',stroke:'#4B5563',text:'#1F2937'},        // 深灰色 - 肿瘤
+  special:{fill:'#FED7AA',stroke:'#EA580C',text:'#9A3412'},       // 橙色系 - 眼科耳鼻喉
+  service:{fill:'#F5F3FF',stroke:'#7C3AED',text:'#4C1D95'},       // 紫罗兰 - 服务
+};
+
+const CATEGORY_BG={
+  foundation:'rgba(0,165,181,0.08)',
+  bridge:'rgba(156,39,176,0.08)',
+  neuro: 'rgba(30,64,175,0.06)',
+  resp:  'rgba(5,150,105,0.06)',
+  digest:'rgba(217,119,6,0.06)',
+  cardio:'rgba(220,38,38,0.06)',
+  endo:  'rgba(219,39,119,0.06)',
+  uro:   'rgba(37,99,235,0.06)',
+  immuno:'rgba(202,138,4,0.06)',
+  onco:  'rgba(75,85,99,0.06)',
+  special:'rgba(234,88,12,0.06)',
+  service:'rgba(83,74,183,0.05)',
+};
+
+// Layer ordering for Y-axis constraint（4层）
+// foundation（基础+核心）/ bridge（靶点）/ clinical（用药+疾病）/ service（药学服务）
+const LAYER_Y={foundation:0.12, bridge:0.35, clinical:0.62, service:0.88};
+
+const rawNodes=[
+  {id:'药理毒理学',layer:'foundation',r:40,category:'foundation'},
+  {id:'生命药学',layer:'foundation',r:28,category:'foundation'},
+  {id:'药物化学',layer:'foundation',r:26,category:'foundation'},
+  {id:'药物动力学',layer:'foundation',r:30,category:'foundation'},
+  {id:'药剂学',layer:'foundation',r:26,category:'foundation'},
+  {id:'受体',layer:'bridge',r:25,category:'bridge'},
+  {id:'酶',layer:'bridge',r:23,category:'bridge'},
+  {id:'离子通道',layer:'bridge',r:25,category:'bridge'},
+  {id:'转运体',layer:'bridge',r:22,category:'bridge'},
+  {id:'激素',layer:'bridge',r:21,category:'bridge'},
+  {id:'病原体',layer:'bridge',r:21,category:'bridge'},
+  {id:'精神与\n中枢神经用药',layer:'clinical',r:26,category:'neuro'},
+  {id:'神经系统\n常见疾病',layer:'clinical',r:24,category:'neuro'},
+  {id:'呼吸系统\n用药',layer:'clinical',r:22,category:'resp'},
+  {id:'呼吸系统\n常见疾病',layer:'clinical',r:22,category:'resp'},
+  {id:'消化系统\n用药',layer:'clinical',r:22,category:'digest'},
+  {id:'消化系统\n常见疾病',layer:'clinical',r:22,category:'digest'},
+  {id:'心血管系统\n用药',layer:'clinical',r:28,category:'cardio'},
+  {id:'血液系统\n用药',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n用药',layer:'clinical',r:26,category:'endo'},
+  {id:'心血管系统\n常见疾病',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n常见疾病',layer:'clinical',r:24,category:'endo'},
+  {id:'泌尿系统\n用药',layer:'clinical',r:22,category:'uro'},
+  {id:'水电解质\n营养用药',layer:'clinical',r:22,category:'uro'},
+  {id:'泌尿系统\n常见疾病',layer:'clinical',r:22,category:'uro'},
+  {id:'抗感染\n药物',layer:'clinical',r:25,category:'immuno'},
+  {id:'解热镇痛\n抗炎抗风湿',layer:'clinical',r:25,category:'immuno'},
+  {id:'皮肤用药\n及抗过敏',layer:'clinical',r:22,category:'immuno'},
+  {id:'免疫系统\n常见疾病',layer:'clinical',r:22,category:'immuno'},
+  {id:'抗肿瘤\n药物',layer:'clinical',r:23,category:'onco'},
+  {id:'肿瘤',layer:'clinical',r:21,category:'onco'},
+  {id:'眼科耳鼻喉\n口腔用药',layer:'clinical',r:22,category:'special'},
+  {id:'慢病\n管理',layer:'service',r:27,category:'service'},
+  {id:'用药安全',layer:'service',r:25,category:'service'},
+  {id:'处方审核\n与调剂',layer:'service',r:24,category:'service'},
+  {id:'用药咨询\n与治疗管理',layer:'service',r:24,category:'service'},
+  {id:'常见病症\n健康管理',layer:'service',r:24,category:'service'},
+];
+
+const rawEdges=[
+  ['药理毒理学','受体','main'],['药理毒理学','酶','main'],['药理毒理学','离子通道','main'],
+  ['药理毒理学','转运体','main'],['药理毒理学','激素','main'],['药理毒理学','病原体','main'],
+  ['药物化学','受体','main'],['药物化学','酶','main'],['药物化学','离子通道','main'],
+  ['生命药学','受体','main'],['生命药学','激素','main'],['生命药学','离子通道','main'],
+  ['受体','精神与\n中枢神经用药','main'],['受体','心血管系统\n用药','main'],['受体','内分泌系统\n用药','main'],
+  ['酶','心血管系统\n用药','main'],['酶','内分泌系统\n用药','main'],['酶','抗感染\n药物','main'],
+  ['酶','抗肿瘤\n药物','main'],['酶','解热镇痛\n抗炎抗风湿','main'],
+  ['离子通道','精神与\n中枢神经用药','main'],['离子通道','心血管系统\n用药','main'],['离子通道','泌尿系统\n用药','main'],
+  ['转运体','精神与\n中枢神经用药','main'],['转运体','内分泌系统\n用药','main'],
+  ['激素','内分泌系统\n用药','main'],['激素','抗肿瘤\n药物','main'],['激素','解热镇痛\n抗炎抗风湿','main'],
+  ['病原体','抗感染\n药物','main'],
+  ['受体','呼吸系统\n用药','main'],['受体','消化系统\n用药','main'],
+  ['受体','皮肤用药\n及抗过敏','main'],['受体','泌尿系统\n用药','main'],
+  ['精神与\n中枢神经用药','神经系统\n常见疾病','main'],
+  ['呼吸系统\n用药','呼吸系统\n常见疾病','main'],
+  ['消化系统\n用药','消化系统\n常见疾病','main'],
+  ['心血管系统\n用药','心血管系统\n常见疾病','main'],
+  ['血液系统\n用药','心血管系统\n常见疾病','main'],
+  ['内分泌系统\n用药','内分泌系统\n常见疾病','main'],
+  ['泌尿系统\n用药','泌尿系统\n常见疾病','main'],
+  ['抗感染\n药物','免疫系统\n常见疾病','main'],
+  ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','main'],
+  ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','main'],
+  ['抗肿瘤\n药物','肿瘤','main'],
+  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢病\n管理','main'],
+  ['药剂学','处方审核\n与调剂','main'],['药理毒理学','用药安全','main'],
+  ['生命药学','常见病症\n健康管理','main'],
+  ['心血管系统\n用药','内分泌系统\n用药','net'],
+  ['心血管系统\n用药','慢病\n管理','net'],
+  ['内分泌系统\n用药','慢病\n管理','net'],
+  ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
+  ['抗感染\n药物','呼吸系统\n常见疾病','net'],
+  ['抗感染\n药物','泌尿系统\n常见疾病','net'],
+  ['解热镇痛\n抗炎抗风湿','常见病症\n健康管理','net'],
+  ['抗肿瘤\n药物','用药安全','net'],
+  ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
+  ['用药咨询\n与治疗管理','用药安全','net'],
+  // V4.1: 修复孤立节点和增强连通性
+  ['药剂学','眼科耳鼻喉\n口腔用药','main'],
+  ['受体','眼科耳鼻喉\n口腔用药','main'],
+  ['病原体','眼科耳鼻喉\n口腔用药','main'],
+  ['眼科耳鼻喉\n口腔用药','常见病症\n健康管理','net'],
+  ['药物动力学','水电解质\n营养用药','main'],
+  ['水电解质\n营养用药','泌尿系统\n常见疾病','main'],
+  ['药物动力学','用药安全','main'],
+  ['心血管系统\n用药','用药安全','net'],
+  ['内分泌系统\n用药','用药安全','net'],
+  ['抗感染\n药物','用药安全','net'],
+];
+
+// System groupings for background frames
+const CATEGORY_GROUPS={
+  foundation:['药理毒理学','生命药学','药物化学','药物动力学','药剂学'],
+  bridge:['受体','酶','离子通道','转运体','激素','病原体'],
+  neuro: ['精神与\n中枢神经用药','神经系统\n常见疾病'],
+  resp:  ['呼吸系统\n用药','呼吸系统\n常见疾病'],
+  digest:['消化系统\n用药','消化系统\n常见疾病'],
+  cardio:['心血管系统\n用药','血液系统\n用药','心血管系统\n常见疾病'],
+  endo:  ['内分泌系统\n用药','内分泌系统\n常见疾病'],
+  uro:   ['泌尿系统\n用药','水电解质\n营养用药','泌尿系统\n常见疾病'],
+  immuno:['抗感染\n药物','解热镇痛\n抗炎抗风湿','皮肤用药\n及抗过敏','免疫系统\n常见疾病'],
+  onco:  ['抗肿瘤\n药物','肿瘤'],
+  special:['眼科耳鼻喉\n口腔用药'],
+  service:['慢病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理'],
+};
+
+const CATEGORY_LABELS={
+  foundation:'基础层',bridge:'靶点层',
+  neuro:'神经系统',resp:'呼吸系统',digest:'消化系统',
+  cardio:'心血管系统',endo:'内分泌系统',uro:'泌尿系统',
+  immuno:'免疫系统',onco:'肿瘤',special:'专科',service:'药学服务',
+};
+
+// ═══════════════════════════════════════════════════
+// ENGINE
+// ═══════════════════════════════════════════════════
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('canvas-wrap');
+const DPR=window.devicePixelRatio||1;
+
+let W,H;
+
+function resize(){
+  W=wrap.clientWidth;
+  H=wrap.clientHeight;
+  canvas.width=W*DPR;
+  canvas.height=H*DPR;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.scale(DPR,DPR);
+  initPositions();
+  runForce(200);
+}
+
+// Node objects with physics
+const nodes=rawNodes.map(n=>({
+  ...n,
+  x:0,y:0,vx:0,vy:0,
+  pinned:false,
+  degree:0,
+}));
+
+const nmap={};
+nodes.forEach(n=>nmap[n.id]=n);
+
+// Adjacency
+const adj={};
+nodes.forEach(n=>adj[n.id]=new Set());
+rawEdges.forEach(([a,b])=>{adj[a].add(b);adj[b].add(a);});
+nodes.forEach(n=>n.degree=adj[n.id].size);
+
+// Scale radius by degree (增强团块感)
+// 多连接节点更大，增强视觉层次和团块感
+nodes.forEach(n=>{
+  const base=rawNodes.find(r=>r.id===n.id).r;
+  n.r=base+Math.min(n.degree*1.2,12); // 增大degree影响，最大增加12
+});
+
+function initPositions(){
+  const cx=W/2;
+  // 初始化层核位置（均匀分布）
+  LAYER_ORDER.forEach((l,i)=>{
+    layerCores[l].y=(i+1)/(LAYER_ORDER.length+1)*H;
+    layerCores[l].vy=0;
+  });
+  // 节点初始位置：X均匀随机分布，Y在层核附近较大范围内随机
+  nodes.forEach(n=>{
+    const coreY=layerCores[n.layer].y;
+    n.x=cx+(Math.random()-0.5)*W*0.6;  // X轴大范围随机分布
+    n.y=coreY+(Math.random()-0.5)*H*0.25; // Y轴在层核附近随机（允许二维分布）
+    n.vx=0; n.vy=0; n.pinned=false;
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// 宇宙四大基本力 物理引擎 · 纯四力版
+// ═══════════════════════════════════════════════════
+//
+// 【强相互作用力】同类节点
+//   · 极近距：强排斥（渐近自由）→ 防止同类重叠
+//   · 中程：吸引（色禁闭）→ 同类紧密成团，不可分散
+//   · 超出作用范围：骤降为零
+//   → 完全替代"硬碰撞"（同类间），并保证聚集
+//
+// 【电磁力】异类节点
+//   · 长程库仑斥力 F∝1/r²
+//   · 同层异类横向推开，跨层异类纵向推开
+//   → 异类不重叠；各类群自然向画布中部平衡（替代弱中心引力）
+//   · 同类之间：短程排斥（同号电荷） → 防止异类重叠的补充
+//
+// 【引力】层间万有引力
+//   · 每个节点被本层"层核"（层质心虚拟天体）吸引
+//   · 层核之间互相排斥（不同层不可合并）
+//   · 节点越偏离层核，受到的回拉力越强
+//   · 层间距由层核排斥自动撑开，无需预设 LAYER_Y
+//   → 动态确定层高度，节点被限制在本层引力井内
+//
+// 【弱相互作用力】量子涨落
+//   · 早期随机扰动，帮助逃离局部极小
+//   · 振幅指数衰减，收敛后静止
+//   → 防止系统冻结在次优布局
+//
+// ═══════════════════════════════════════════════════
+
+// 层定义（顺序决定初始纵向排布）
+const LAYER_ORDER=['foundation','bridge','clinical','service'];
+
+// 层核：每层一个虚拟质心天体，位置动态更新
+const layerCores={};
+LAYER_ORDER.forEach((l,i)=>{
+  layerCores[l]={y: H*0.2 + Math.random()*H*0.6, vy:0};
+});
+
+function runForce(steps){
+  const pad=50;
+  const damp=0.82;
+  const MAX_V=25;
+
+  // ── 强相互作用力 ──────────────────────────────
+  // 同类节点间：近排远吸，作用范围有限，有明确平衡距离
+  // 调整：增强排斥力，防止节点重叠
+  const S_REPULSE_K = 45000;   // 近程排斥强度（大幅增强）
+  const S_TARGET_F  = 1.8;     // 平衡距离 = minDist × 此值（同类节点理想间距）
+  const S_RANGE     = 580;     // 强力射程（增大，让远程同类也有吸引力）
+  const S_DECAY     = 1.1;     // 射程内指数衰减系数（减小，保持远程吸引力）
+  const S_ALPHA     = 0.35;    // 中程吸引力系数（增强，让同类更紧密聚集）
+  const S_DAMP      = 0.95;    // 同类节点内部阻尼（防止被瞬间撕裂）
+
+  // ── 电磁力（类别电荷模型）────────────────────
+  // 节点携带类别电荷：q_c = √N_c（类别节点数的平方根）
+  // 同层不同类：同极相斥（q_i × q_j > 0）
+  // 异层同类：异极相吸（q_i × q_j < 0）
+  // 物理实现：节点级；视觉结果：类别级
+  const EM_K        = 15000;   // 电磁力强度系数（降低，减少对同类团块的干扰）
+  const EM_RANGE    = 350;     // 电磁力作用范围（缩小，只影响邻近异类）
+  const EM_MAX_F    = 22;      // 电磁力上限（降低，避免撕裂同类团块）
+
+  // ── 层势阱（Gravity）────────────────────────
+  // 节点被本层势阱吸引，但不固定Y坐标
+  // 层与层之间可以自由浮动
+  const G_WELL_K    = 0.08;    // 层势阱引力系数
+  const G_CORE_REP  = 50000;   // 层核之间排斥常量
+  const G_CORE_DAMP = 0.78;    // 层核速度阻尼
+
+  // ── 弱相互作用力 ──────────────────────────────
+  // 边界恢复弹力：只防止节点跑出画布，不限制层内分布
+  const W_BOUND_K   = 0.40;    // 边界恢复弹力系数
+  const W_DAMP      = 0.985;   // 边界力衰减系数
+  const W_TOP_PAD   = 0.05;    // 顶部边界余量
+  const W_BOT_PAD   = 0.05;    // 底部边界余量
+
+  for(let step=0;step<steps;step++){
+    const alpha = Math.max(0, 1 - step/steps);
+
+    // ════════════════════════════════════════════
+    // 【引力 Part A】更新层核 Y 位置
+    // 层核是独立物理实体，只受：
+    // 1. 其他层核的排斥力（使用G_CORE_REP）
+    // 2. 边界恢复力
+    // 不追踪节点质心，避免层漂移
+    // ════════════════════════════════════════════
+    // 层核之间互相排斥
+    for(let i=0;i<LAYER_ORDER.length;i++){
+      for(let j=i+1;j<LAYER_ORDER.length;j++){
+        const ca=layerCores[LAYER_ORDER[i]];
+        const cb=layerCores[LAYER_ORDER[j]];
+        const dy=cb.y-ca.y;
+        const dist=Math.max(Math.abs(dy), 30);
+        // 使用 G_CORE_REP 实现层核之间的斥力（类似电磁力）
+        const repF=Math.min(G_CORE_REP/(dist*dist), 15);
+        const dir=dy>=0?1:-1;
+        ca.vy-=dir*repF;
+        cb.vy+=dir*repF;
+      }
+    }
+    // 层核边界恢复力（防止层核跑出画布）
+    LAYER_ORDER.forEach(l=>{
+      const c=layerCores[l];
+      const coreMargin=H*0.12;
+      // 顶部边界
+      if(c.y < coreMargin){
+        c.vy += (coreMargin - c.y) * 0.08;
+      }
+      // 底部边界
+      if(c.y > H - coreMargin){
+        c.vy += (H - coreMargin - c.y) * 0.08;
+      }
+      // 阻尼和位置更新
+      c.vy *= G_CORE_DAMP;
+      c.y += c.vy;
+      c.y = Math.max(H*0.08, Math.min(H*0.92, c.y));
+    });
+
+    // ════════════════════════════════════════════
+    // 【强相互作用力】重构：簇心吸引 + 节点间排斥
+    // 实现二维稳定聚簇
+    // ════════════════════════════════════════════
+    // 第一步：计算每个类别的质心
+    const catCenters={};
+    const catNodes={};
+    nodes.forEach(n=>{
+      if(!catNodes[n.category]){
+        catNodes[n.category]=[];
+        catCenters[n.category]={x:0,y:0};
+      }
+      catNodes[n.category].push(n);
+      catCenters[n.category].x+=n.x;
+      catCenters[n.category].y+=n.y;
+    });
+    // 计算质心坐标
+    Object.keys(catCenters).forEach(cat=>{
+      const count=catNodes[cat].length;
+      catCenters[cat].x/=count;
+      catCenters[cat].y/=count;
+    });
+
+    // 第二步：强力 = 簇心吸引 + 节点间短程排斥
+    for(let i=0;i<nodes.length;i++){
+      const a=nodes[i];
+      if(a.pinned)continue;
+      
+      // 【簇心吸引】节点→类别质心的吸引力（支持二维稳定）
+      const center=catCenters[a.category];
+      if(center){
+        const dcx=center.x-a.x, dcy=center.y-a.y;
+        const distToCenter=Math.sqrt(dcx*dcx+dcy*dcy);
+        if(distToCenter>0){
+          const ncx=dcx/distToCenter, ncy=dcy/distToCenter;
+          // 吸引力随距离增大而增强，但有上限
+          const clusterF=Math.min(distToCenter*S_ALPHA*0.5, 8);
+          a.vx+=ncx*clusterF;
+          a.vy+=ncy*clusterF;
+        }
+      }
+    }
+
+    // 第三步：节点间短程排斥（防止重叠）
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i], b=nodes[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.max(Math.sqrt(dx*dx+dy*dy), 1);
+        const nx=dx/dist, ny=dy/dist;
+        const minDist=a.r+b.r+14;
+
+        if(a.category===b.category){
+          // 【节点间排斥】分两段：强排斥 + 弱排斥，防止重叠
+          const targetDist=minDist*S_TARGET_F;
+          
+          if(dist < minDist){
+            // 强排斥：距离过近时强力推开
+            const safeDist=Math.max(dist, minDist*0.2);
+            const repF=Math.min(S_REPULSE_K/(safeDist*safeDist), 300);
+            if(!a.pinned){a.vx-=nx*repF; a.vy-=ny*repF;}
+            if(!b.pinned){b.vx+=nx*repF; b.vy+=ny*repF;}
+          } else if(dist < targetDist){
+            // 弱排斥：中等距离时轻微推开，保持间距
+            const repF=(targetDist-dist)*0.25;
+            if(!a.pinned){a.vx-=nx*repF; a.vy-=ny*repF;}
+            if(!b.pinned){b.vx+=nx*repF; b.vy+=ny*repF;}
+          }
+          // 同类中远程吸引已由簇心吸引处理
+
+        } else {
+          // ════════════════════════════
+          // 【电磁力】类别电荷模型
+          // · 同层不同类：同极相斥（q_i × q_j > 0）
+          // · 异层同类：异极相吸（q_i × q_j < 0）
+          // ════════════════════════════
+          if(dist < EM_RANGE && dist > 1){
+            const qa=Math.sqrt(catNodes[a.category]?.length || 1);
+            const qb=Math.sqrt(catNodes[b.category]?.length || 1);
+            const sameLayer=(a.layer===b.layer);
+            const sameCat=(a.category===b.category);
+
+            if(sameLayer && !sameCat){
+              // 同层不同类：排斥 + 横向分散
+              // 增加X/Y分量，保证不同类在同层分散，减少混合重叠
+              const kx = Math.abs(dx) > 1 ? dx/dist : (Math.random()-0.5)*0.01;
+              const ky = Math.abs(dy) > 1 ? dy/dist : (Math.random()-0.5)*0.01;
+              const emF = Math.min(EM_K * qa * qb / (dist*dist), EM_MAX_F) * (alpha*0.5+0.5);
+              if(!a.pinned){a.vx -= kx*emF; a.vy -= ky*emF;}
+              if(!b.pinned){b.vx += kx*emF; b.vy += ky*emF;}
+            } else if(!sameLayer && sameCat){
+              // 异层同类：吸引（保持沿连线方向）
+              const emF = Math.min(EM_K * qa * qb / (dist*dist), EM_MAX_F) * (alpha*0.5+0.5);
+              if(!a.pinned){a.vx -= nx*emF; a.vy -= ny*emF;}
+              if(!b.pinned){b.vx += nx*emF; b.vy += ny*emF;}
+            }
+          }
+        }
+      }
+    }
+
+    // ════════════════════════════════════════════
+    // 【层势阱 Gravity】节点被本层吸引
+    // 向层核方向靠拢，但不固定Y坐标
+    // 层与层之间可以自由浮动
+    // ════════════════════════════════════════════
+
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      const coreY=layerCores[n.layer].y;
+      // Y方向引力：拉向层核Y坐标
+      const dyToCore=coreY-n.y;
+      n.vy+=dyToCore*G_WELL_K;
+    });
+
+    // ════════════════════════════════════════════
+    // 【弱相互作用力】边界恢复弹力
+    // 防止节点跑出画布边界，不干扰团块形成
+    // ════════════════════════════════════════════
+    const weakK = W_BOUND_K * Math.pow(W_DAMP, step); // 逐渐减弱，避免振荡
+    const topPad = H * W_TOP_PAD;
+    const botPad = H * W_BOT_PAD;
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      // 顶部边界恢复
+      if(n.y < topPad + n.r){
+        n.vy += (topPad + n.r - n.y) * weakK;
+      }
+      // 底部边界恢复
+      if(n.y > H - botPad - n.r){
+        n.vy += (H - botPad - n.r - n.y) * weakK;
+      }
+    });
+
+    // ════════════════════════════════════════════
+    // 速度积分 + 阻尼 + 边界
+    // ════════════════════════════════════════════
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      n.vx*=damp; n.vy*=damp;
+      const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+      if(spd>MAX_V){n.vx=n.vx/spd*MAX_V; n.vy=n.vy/spd*MAX_V;}
+      n.x+=n.vx; n.y+=n.vy;
+      if(!isFinite(n.x)||!isFinite(n.y)){
+        n.x=W/2+(Math.random()-0.5)*80;
+        n.y=layerCores[n.layer]?.y||(H*0.5);
+        n.vx=0; n.vy=0;
+      }
+      n.x=Math.max(pad+n.r, Math.min(W-pad-n.r, n.x));
+      n.y=Math.max(pad+n.r, Math.min(H-pad-n.r, n.y));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// INTERACTION STATE
+// ═══════════════════════════════════════════════════
+let hovered=null;
+let locked=null;       // locked node id
+let activeSystem=null; // system filter
+let searchQuery='';
+let drag=null;         // {node, ox, oy}
+
+// Pan / zoom
+let pan={x:0,y:0};
+let zoom=1;
+
+function toWorld(cx,cy){
+  return {x:(cx-pan.x)/zoom, y:(cy-pan.y)/zoom};
+}
+
+// Adjacency 2-hop
+function getHighlighted(id){
+  if(!id)return null;
+  const set=new Set();
+  set.add(id);
+  adj[id].forEach(nb=>{
+    set.add(nb);
+    adj[nb].forEach(nb2=>set.add(nb2));
+  });
+  return set;
+}
+
+// ═══════════════════════════════════════════════════
+// INFO PANEL
+// ═══════════════════════════════════════════════════
+function showPanel(nodeId, mouseX, mouseY){
+  const panel=document.getElementById('info-panel');
+  if(!nodeId){panel.classList.remove('visible');return;}
+
+  // 计算面板位置（跟随鼠标，右下偏移，避免超出画布）
+  let px = mouseX + 15;
+  let py = mouseY + 15;
+  const panelW = 220;
+  const panelH = 200; // 估算高度
+  if(px + panelW > W - 10) px = mouseX - panelW - 15;
+  if(py + panelH > H - 10) py = mouseY - panelH - 15;
+  panel.style.left = px + 'px';
+  panel.style.top = py + 'px';
+
+  panel.classList.add('visible');
+  const info=NODE_INFO[nodeId]||{};
+  const n=nmap[nodeId];
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.core;
+
+  document.getElementById('info-panel-name').textContent=nodeId.replace(/\n/g,' ');
+
+  const codeEl=document.getElementById('info-panel-code');
+  codeEl.textContent=info.code||'';
+  codeEl.style.background=colors.fill;
+  codeEl.style.color=colors.text;
+  codeEl.style.border='1px solid '+colors.stroke+'44';
+
+  document.getElementById('info-panel-desc').textContent=info.desc||'';
+
+  const linksEl=document.getElementById('info-panel-links');
+  const nbIds=[...adj[nodeId]];
+  if(nbIds.length){
+    const nLayerIdx=LAYER_ORDER.indexOf(n.layer);
+    const upstream=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)<nLayerIdx;
+    });
+    const downstream=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)>nLayerIdx;
+    });
+    let html='';
+    if(upstream.length){
+      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,' ')}</span>`).join('')}</div>`;
+    }
+    if(downstream.length){
+      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,' ')}</span>`).join('')}</div>`;
+    }
+    linksEl.innerHTML=html;
+  } else {
+    linksEl.innerHTML='';
+  }
+  panel.classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════
+function computeGroupFrames(){
+  const frames={};
+  Object.entries(CATEGORY_GROUPS).forEach(([sys,ids])=>{
+    const ns=ids.map(id=>nmap[id]).filter(Boolean);
+    if(!ns.length)return;
+    const pad=28+Math.max(...ns.map(n=>n.r));
+    const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y);
+    frames[sys]={
+      minX:Math.min(...xs)-pad,
+      maxX:Math.max(...xs)+pad,
+      minY:Math.min(...ys)-pad-12,
+      maxY:Math.max(...ys)+pad,
+    };
+  });
+  return frames;
+}
+
+function drawGroupBg(frames){
+  Object.entries(frames).forEach(([sys,f])=>{
+    const bg=CATEGORY_BG[sys]||'rgba(200,200,200,0.05)';
+    const stroke=CATEGORY_COLORS[sys]?.stroke||'#ccc';
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,16);
+    ctx.fillStyle=bg;
+    ctx.fill();
+    ctx.strokeStyle=stroke+'28';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.restore();
+
+    // Label: top-outside the frame
+    ctx.save();
+    ctx.font='600 9px Noto Sans SC,sans-serif';
+    ctx.textAlign='left';
+    ctx.textBaseline='bottom';
+    ctx.fillStyle=CATEGORY_COLORS[sys]?.stroke||'#888';
+    ctx.globalAlpha=0.7;
+    ctx.fillText(CATEGORY_LABELS[sys]||sys, f.minX+6, f.minY-2);
+    ctx.restore();
+  });
+}
+
+function drawEdge(a,b,type,highlighted){
+  ctx.save();
+  const isLit=highlighted?highlighted.has(a.id)&&highlighted.has(b.id):true;
+
+  ctx.globalAlpha=isLit?1:0.04;
+
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y);
+  const mx=(a.x+b.x)/2;
+  const my=(a.y+b.y)/2;
+  const dy=Math.abs(b.y-a.y);
+  const curve=dy>100?40:16;
+  ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+
+  if(type==='net'){
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle=isLit?'rgba(216,90,48,0.5)':'rgba(216,90,48,0.3)';
+    ctx.lineWidth=1;
+  } else {
+    ctx.setLineDash([]);
+    ctx.strokeStyle=isLit?'rgba(80,110,160,0.3)':'rgba(180,185,190,0.15)';
+    ctx.lineWidth=isLit?1.2:0.7;
+  }
+  ctx.stroke();
+
+  // Highlight glow
+  if(isLit&&highlighted){
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+    ctx.strokeStyle='rgba(24,95,165,0.07)';
+    ctx.lineWidth=10;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawNode(n,highlighted){
+  const isHovered=hovered===n.id;
+  const isLocked=locked===n.id;
+  const isActive=!highlighted||highlighted.has(n.id);
+  const isSysFilter=!activeSystem||(CATEGORY_GROUPS[activeSystem]||[]).includes(n.id)
+    ||(n.category==='core'||n.category==='bridge');
+
+  ctx.save();
+  let alpha=1;
+  if(!isActive)alpha=0.07;
+  else if(!isSysFilter)alpha=0.15;
+  ctx.globalAlpha=alpha;
+
+  const scale=isHovered||isLocked?1.12:1;
+  const nodeR=n.r*scale;
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.core;
+
+  if(isHovered||isLocked){
+    ctx.shadowColor=colors.stroke+'55';
+    ctx.shadowBlur=18;
+    ctx.shadowOffsetY=3;
+  }
+
+  // Fill
+  ctx.beginPath();
+  ctx.arc(n.x,n.y,nodeR,0,Math.PI*2);
+  const grad=ctx.createRadialGradient(n.x-nodeR*0.3,n.y-nodeR*0.3,0,n.x,n.y,nodeR);
+  grad.addColorStop(0,lighten(colors.fill,0.3));
+  grad.addColorStop(1,colors.fill);
+  ctx.fillStyle=grad;
+  ctx.fill();
+
+  ctx.shadowColor='transparent';
+
+  // Stroke
+  ctx.strokeStyle=colors.stroke;
+  ctx.lineWidth=isHovered||isLocked?2.5:1.3;
+  ctx.stroke();
+
+  // Locked indicator ring
+  if(isLocked){
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,nodeR+5,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+'55';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([4,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Text
+  ctx.globalAlpha=alpha;
+  ctx.fillStyle=colors.text;
+  const fontSize=n.r>28?12:n.r>22?11:10;
+  ctx.font=(isHovered||isLocked?'700':'500')+' '+fontSize+'px Noto Sans SC,sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const lines=n.id.split('\n');
+  const lh=fontSize+3;
+  lines.forEach((line,i)=>{
+    ctx.fillText(line,n.x,n.y-(lines.length-1)*lh/2+i*lh);
+  });
+
+  ctx.restore();
+}
+
+function lighten(hex,amt){
+  // simple: return color as-is (already light fills)
+  return hex;
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle='#fafbfc';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.save();
+  ctx.translate(pan.x,pan.y);
+  ctx.scale(zoom,zoom);
+
+  const frames=computeGroupFrames();
+
+  // Active system highlight overlay
+  if(activeSystem){
+    ctx.save();
+    ctx.fillStyle='rgba(240,245,255,0.5)';
+    ctx.fillRect(-pan.x/zoom,-pan.y/zoom,W/zoom,H/zoom);
+    ctx.restore();
+  }
+
+  drawGroupBg(frames);
+
+  const focusId=locked||hovered;
+  const highlighted=focusId?getHighlighted(focusId):null;
+
+  // System filter: build set
+  let sysSet=null;
+  if(activeSystem){
+    sysSet=new Set(CATEGORY_GROUPS[activeSystem]||[]);
+    // always show core/bridge
+    nodes.forEach(n=>{if(n.category==='core'||n.category==='bridge')sysSet.add(n.id);});
+  }
+
+  // Edges
+  rawEdges.forEach(([a,b,type])=>{
+    const na=nmap[a],nb=nmap[b];
+    if(na&&nb) drawEdge(na,nb,type,highlighted);
+  });
+
+  // Nodes
+  nodes.forEach(n=>drawNode(n,highlighted));
+
+  ctx.restore();
+
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════════════════
+// MOUSE / TOUCH EVENTS
+// ═══════════════════════════════════════════════════
+function getNodeAt(cx,cy){
+  const {x,y}=toWorld(cx,cy);
+  for(const n of nodes){
+    const dx=x-n.x,dy=y-n.y;
+    if(dx*dx+dy*dy<(n.r+6)*(n.r+6))return n;
+  }
+  return null;
+}
+
+function getGroupAt(cx,cy){
+  const {x,y}=toWorld(cx,cy);
+  const frames=computeGroupFrames();
+  for(const [sys,f] of Object.entries(frames)){
+    if(x>=f.minX && x<=f.maxX && y>=f.minY && y<=f.maxY){
+      return {sys, frame:f};
+    }
+  }
+  return null;
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+
+  if(drag){
+    const {x,y}=toWorld(cx,cy);
+    if(drag.type==='node'){
+      drag.node.x=x;
+      drag.node.y=y;
+      drag.node.vx=0;drag.node.vy=0;
+    } else if(drag.type==='group'){
+      // 先获取旧的框位置（在移动任何节点之前）
+      const oldFrame=computeGroupFrames()[drag.sys];
+      if(!oldFrame)return;
+      
+      // 计算新的框左上角位置
+      const newMinX=x-drag.offsetX;
+      const newMinY=y-drag.offsetY;
+      
+      // 计算偏移量
+      const dx=newMinX-oldFrame.minX;
+      const dy=newMinY-oldFrame.minY;
+      
+      // 移动该类所有节点
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+        const node=nmap[id];
+        if(node){
+          node.x+=dx;
+          node.y+=dy;
+          node.vx=0;node.vy=0;
+        }
+      });
+    }
+    return;
+  }
+
+  const n=getNodeAt(cx,cy);
+  const group=getGroupAt(cx,cy);
+  hovered=n?n.id:null;
+  canvas.style.cursor=n||group?'pointer':'default';
+
+  if(!locked){
+    showPanel(n?n.id:null, cx, cy);
+  }
+});
+
+canvas.addEventListener('click',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+  const n=getNodeAt(cx,cy);
+  if(n){
+    if(locked===n.id){locked=null;showPanel(null);}
+    else{locked=n.id;showPanel(n.id,cx,cy);}
+  } else {
+    locked=null;showPanel(null);
+  }
+});
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+  
+  // 优先检查节点
+  const n=getNodeAt(cx,cy);
+  if(n){
+    drag={node:n, type:'node'};
+    n.pinned=true;
+    return;
+  }
+  
+  // 检查类背景框
+  const group=getGroupAt(cx,cy);
+  if(group){
+    const {x,y}=toWorld(cx,cy);
+    drag={
+      type:'group',
+      sys:group.sys,
+      offsetX:x-group.frame.minX,
+      offsetY:y-group.frame.minY
+    };
+    // 锁定该类所有节点
+    (CATEGORY_GROUPS[group.sys]||[]).forEach(id=>{
+      const node=nmap[id];
+      if(node)node.pinned=true;
+    });
+  }
+});
+
+canvas.addEventListener('mouseup',()=>{
+  if(drag){
+    if(drag.type==='node'){
+      drag.node.pinned=false;
+    } else if(drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+        const node=nmap[id];
+        if(node)node.pinned=false;
+      });
+    }
+    drag=null;
+  }
+});
+
+canvas.addEventListener('mouseleave',()=>{
+  if(drag){
+    if(drag.type==='node'){
+      drag.node.pinned=false;
+    } else if(drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+        const node=nmap[id];
+        if(node)node.pinned=false;
+      });
+    }
+    drag=null;
+  }
+  hovered=null;
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  const delta=e.deltaY>0?0.9:1.1;
+  const newZoom=Math.max(0.4,Math.min(3,zoom*delta));
+  pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+  pan.y=my-(my-pan.y)*(newZoom/zoom);
+  zoom=newZoom;
+},{passive:false});
+
+// ═══════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════
+
+// Hide hint bar after 3s
+setTimeout(()=>{
+  const h=document.getElementById('hint-bar');
+  h.style.opacity='0';
+  setTimeout(()=>h.style.display='none',400);
+},3000);
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+resize();
+render();
+
+window.addEventListener('resize',()=>{
+  pan={x:0,y:0};zoom=1;
+  resize();
+});
+</script>
+</body>
+</html>

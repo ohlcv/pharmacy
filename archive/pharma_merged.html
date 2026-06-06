@@ -1,0 +1,488 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,sans-serif);background:transparent}
+#wrap{width:100%;position:relative;background:#ffffff;border:.5px solid #e0ddd5;border-radius:12px;overflow:hidden}
+@media(prefers-color-scheme:dark){#wrap{background:#1a1a18;border-color:#3a3a36}}
+canvas{display:block;width:100%}
+#header{padding:12px 16px 8px;border-bottom:.5px solid #e0ddd5}
+@media(prefers-color-scheme:dark){#header{border-color:#3a3a36}}
+#header-title{font-size:14px;font-weight:600;color:#1a1a18;letter-spacing:.02em}
+@media(prefers-color-scheme:dark){#header-title{color:#f0ede4}}
+#header-sub{font-size:10px;color:#888;margin-top:2px}
+#info{padding:10px 14px;border-top:.5px solid #e0ddd5;background:#f7f5f0;min-height:64px}
+@media(prefers-color-scheme:dark){#info{border-color:#3a3a36;background:#222220}}
+#info-title{font-size:12px;font-weight:600;color:#1a1a18;margin-bottom:3px}
+@media(prefers-color-scheme:dark){#info-title{color:#f0ede4}}
+#info-code{font-size:10px;color:#888;margin-bottom:4px}
+#info-body{font-size:11px;color:#555;line-height:1.65}
+@media(prefers-color-scheme:dark){#info-body{color:#aaa}}
+#info-group{font-size:10px;color:#888;margin-top:4px}
+.legend-row{display:flex;gap:10px;flex-wrap:wrap;padding:7px 14px;border-top:.5px solid #e0ddd5;background:#f7f5f0}
+@media(prefers-color-scheme:dark){.legend-row{border-color:#3a3a36;background:#222220}}
+.leg{font-size:10px;color:#888;display:flex;align-items:center;gap:4px}
+.ldot{width:9px;height:9px;border-radius:50%;display:inline-block}
+</style>
+
+<div id="wrap">
+<div id="header">
+  <div id="header-title">药学知识拓扑图</div>
+  <div id="header-sub">悬停节点查看详细说明 · 五层知识体系：基础层 → 桥接靶点层 → 药物系统层 → 疾病层 → 药学服务层</div>
+</div>
+<canvas id="c"></canvas>
+<div id="info">
+  <div id="info-title" style="color:#999">悬停任意节点查看详情</div>
+  <div id="info-code"></div>
+  <div id="info-body"></div>
+  <div id="info-group"></div>
+</div>
+<div class="legend-row">
+  <div class="leg"><span class="ldot" style="background:#0F6E56"></span>基础层</div>
+  <div class="leg"><span class="ldot" style="background:#D85A30"></span>桥接靶点层</div>
+  <div class="leg"><span class="ldot" style="background:#185FA5"></span>药物(A类)</div>
+  <div class="leg"><span class="ldot" style="background:#3B6D11"></span>疾病(B类)</div>
+  <div class="leg"><span class="ldot" style="background:#534AB7"></span>药学服务层</div>
+  <div class="leg" style="margin-left:auto">
+    <span style="display:inline-block;width:16px;height:2px;background:#aaa;opacity:.5;vertical-align:middle"></span>&nbsp;树状边
+  </div>
+  <div class="leg">
+    <span style="display:inline-block;width:16px;height:0;border-top:2px dashed #D85A30;opacity:.7;vertical-align:middle"></span>&nbsp;网状边
+  </div>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const dark = matchMedia('(prefers-color-scheme:dark)').matches;
+
+const DPR = window.devicePixelRatio || 1;
+const W = document.getElementById('wrap').offsetWidth;
+const H = 620;
+canvas.width = W * DPR;
+canvas.height = H * DPR;
+canvas.style.height = H + 'px';
+ctx.scale(DPR, DPR);
+
+// Hard colors — no CSS vars
+const BG       = dark ? '#1a1a18' : '#ffffff';
+const BAND_ALT = dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)';
+const BAND_LBL = dark ? 'rgba(220,215,200,0.3)' : 'rgba(60,58,50,0.3)';
+const TREE_E   = dark ? 'rgba(180,175,160,0.16)' : 'rgba(100,95,80,0.16)';
+const TREE_EH  = dark ? 'rgba(180,175,160,0.7)'  : 'rgba(80,75,60,0.7)';
+
+// System groupings for drug layer — color per system group
+const SYS_GROUPS = {
+  'neuro':   { name:'神经调控系统',   color: dark?'#1a3a5c':'#D6E8F9', stroke:'#185FA5' },
+  'resp':    { name:'呼吸系统',       color: dark?'#1a3f36':'#D4EDE5', stroke:'#0F7A5A' },
+  'digest':  { name:'消化系统',       color: dark?'#3d2a0a':'#FBF0DA', stroke:'#A0660F' },
+  'cardio':  { name:'心血管循环系统', color: dark?'#3d1515':'#FAE0E0', stroke:'#C43030' },
+  'urowater':{ name:'泌尿·水盐平衡', color: dark?'#0e2e3d':'#D4EBF5', stroke:'#1478A0' },
+  'endo':    { name:'内分泌代谢系统', color: dark?'#27193d':'#EDE8FA', stroke:'#6A3BB5' },
+  'immuno':  { name:'炎症免疫系统',   color: dark?'#3d2b10':'#FAF0DE', stroke:'#B07020' },
+  'onco':    { name:'肿瘤系统',       color: dark?'#1e1e1e':'#EBEBEB', stroke:'#666' },
+  'special': { name:'专科局部系统',   color: dark?'#1a2d1a':'#E2F0E2', stroke:'#3A7A3A' },
+};
+
+// Layer palette for found/bridge/svc
+const C = {
+  found:  { fill: dark?'#04342C':'#E1F5EE', stroke:'#0F6E56', text: dark?'#9FE1CB':'#085041' },
+  bridge: { fill: dark?'#4a1010':'#FAECE7', stroke:'#D85A30', text: dark?'#F7B8B8':'#8B3018' },
+  svc:    { fill: dark?'#26215C':'#EEEDFE', stroke:'#534AB7', text: dark?'#CECBF6':'#26215C' },
+  dis:    { fill: dark?'#173404':'#EAF3DE', stroke:'#3B6D11', text: dark?'#C0DD97':'#27500A' },
+};
+
+const LY = { found:58, bridge:165, drug:310, dis:455, svc:562 };
+const BANDS = [
+  {y:12,  h:96,  label:'① 基础层（第一性原理）'},
+  {y:122, h:90,  label:'② 桥接靶点层（受体/酶/通道/转运体）'},
+  {y:236, h:148, label:'③ 药物系统层（A类章节）'},
+  {y:408, h:92,  label:'④ 疾病层（B类章节）'},
+  {y:524, h:80,  label:'⑤ 药学服务层'},
+];
+
+const NODE_INFO = {
+  '生命药学':   { code:'基础层', sub:'人体基础', group:'', desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。连接全部系统药物与各系统疾病。' },
+  '药理毒理学': { code:'基础层', sub:'作用规律', group:'', desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁，直接支撑用药安全和急救。' },
+  '药物化学':   { code:'基础层', sub:'结构本源', group:'', desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。与受体、酶、离子通道、转运体靶点紧密耦合。' },
+  '药物动力学': { code:'基础层', sub:'ADME',     group:'', desc:'吸收-分布-代谢-排泄（ADME）四过程。横向连接全部药物，纵向支撑处方审核、用药咨询、用药安全。' },
+  '药剂学':     { code:'基础层', sub:'剂型载体', group:'', desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核，覆盖大部分A类药物。' },
+
+  '受体':     { code:'桥接靶点层', sub:'', group:'', desc:'G蛋白偶联受体、核受体、酶联受体等。连接精神中枢（多巴胺/5-HT）、心血管（β/α受体）、呼吸（β2受体）、消化（M/H2受体）。' },
+  '酶':       { code:'桥接靶点层', sub:'', group:'', desc:'ACE、COX、DPP-4、拓扑异构酶等。连接心血管（ACEI/ARB）、解热镇痛（NSAIDs）、内分泌（DPP-4抑制剂）、抗感染、抗肿瘤。' },
+  '离子通道': { code:'桥接靶点层', sub:'', group:'', desc:'钙通道、钠通道、钾通道、氯通道。连接心血管（钙通道阻滞剂、抗心律失常药）、精神中枢（钠通道阻滞剂）、泌尿（髓袢利尿剂）。' },
+  '转运体':   { code:'桥接靶点层', sub:'', group:'', desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。连接精神中枢（SSRI）、内分泌（SGLT2抑制剂）、泌尿（尿酸/电解质排泄）。' },
+  '激素':     { code:'桥接靶点层', sub:'', group:'', desc:'内源性激素信号分子作为靶点或药物本身。连接内分泌（胰岛素、甲状腺激素）、解热镇痛抗炎（糖皮质激素）、抗肿瘤（激素类）。' },
+  '病原体':   { code:'桥接靶点层', sub:'', group:'', desc:'细菌（细胞壁/蛋白质合成/核酸合成）、病毒（逆转录酶/神经氨酸酶）、真菌（麦角固醇）等靶点，主要连接抗感染药物全系列。' },
+
+  '精神与\n中枢神经用药':  { code:'A1 · 神经调控系统', sub:'', group:'neuro',    desc:'靶点：受体（多巴胺D2、5-HT、GABA、阿片）、离子通道（Na+）、转运体（SERT/NET）。对应疾病：神经系统常见疾病。' },
+  '解热镇痛\n抗炎抗风湿':  { code:'A2 · 炎症免疫系统', sub:'', group:'immuno',   desc:'靶点：COX酶（NSAIDs）、受体（阿片受体）、激素（糖皮质激素）。跨系统：免疫系统疾病、常见病症健康管理。' },
+  '呼吸系统\n用药':        { code:'A3 · 呼吸系统',     sub:'', group:'resp',     desc:'靶点：受体（β2激动剂、M受体拮抗剂）。药动学影响吸入制剂生物利用度。对应：呼吸系统常见疾病。' },
+  '消化系统\n用药':        { code:'A4 · 消化系统',     sub:'', group:'digest',   desc:'靶点：受体（H2受体、M受体、多巴胺受体、5-HT4受体）、酶（H+/K+-ATPase质子泵）。对应：消化系统疾病。' },
+  '心血管系统\n用药':      { code:'A5 · 心血管循环系统', sub:'', group:'cardio',  desc:'靶点：受体（β/α受体）、离子通道（L型Ca2+通道）、酶（ACE/HMG-CoA还原酶）。关联：心血管疾病、慢性病管理。' },
+  '血液系统\n用药':        { code:'A6 · 心血管循环系统', sub:'', group:'cardio',  desc:'靶点：凝血酶、Xa因子、ADP受体（P2Y12）、GP IIb/IIIa受体。抗凝、溶栓、抗血小板。关联：心血管疾病。' },
+  '泌尿系统\n用药':        { code:'A7 · 泌尿·水盐平衡', sub:'', group:'urowater', desc:'靶点：离子通道（Na-K-2Cl转运体）、受体（α1受体）、转运体（肾小管）。关联：泌尿系统常见疾病。' },
+  '内分泌系统\n用药':      { code:'A8 · 内分泌代谢系统', sub:'', group:'endo',   desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）、受体（核受体/甲状腺素受体）。关联：内分泌疾病、慢性病管理。' },
+  '抗感染\n药物':          { code:'A9 · 炎症免疫系统', sub:'', group:'immuno',   desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成、细胞膜。跨系统：呼吸、免疫、泌尿系统疾病。' },
+  '抗肿瘤\n药物':          { code:'A10 · 肿瘤系统',    sub:'', group:'onco',     desc:'靶点：拓扑异构酶（酶）、激素受体、PD-1/CTLA-4（受体）。细胞毒类、靶向类、免疫检查点。关联：肿瘤、用药安全、急救。' },
+  '水电解质\n营养用药':    { code:'A11 · 泌尿·水盐平衡', sub:'', group:'urowater', desc:'调节水、电解质、酸碱平衡与营养。与药动学密切关联（分布容积、蛋白结合）。用于支持治疗。' },
+  '眼科耳鼻喉\n口腔用药':  { code:'A12 · 专科局部系统', sub:'', group:'special', desc:'局部靶点为主，药剂学（制剂、黏度）影响疗效。' },
+  '皮肤用药\n及抗过敏':    { code:'A13 · 炎症免疫系统', sub:'', group:'immuno',  desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。关联：免疫系统疾病。' },
+
+  '呼吸系统\n常见疾病':    { code:'B8 · 疾病层', sub:'', group:'', desc:'哮喘、COPD、肺炎。上游药物：呼吸系统用药（A3）、抗感染药物（A9）。' },
+  '心血管系统\n常见疾病':  { code:'B9 · 疾病层', sub:'', group:'', desc:'高血压、冠心病、心衰、心律失常。上游药物：心血管用药（A5）、血液系统用药（A6）。与内分泌疾病、慢性病管理高度关联。' },
+  '神经系统\n常见疾病':    { code:'B10 · 疾病层', sub:'', group:'', desc:'帕金森、癫痫、失眠、抑郁、精神分裂。上游药物：精神与中枢神经系统用药（A1）。' },
+  '消化系统\n常见疾病':    { code:'B11 · 疾病层', sub:'', group:'', desc:'消化性溃疡、肠易激、便秘、腹泻。上游药物：消化系统用药（A4）。' },
+  '内分泌系统\n常见疾病':  { code:'B12 · 疾病层', sub:'', group:'', desc:'糖尿病、甲亢/甲减、骨质疏松。上游药物：内分泌用药（A8）。与心血管疾病共病高度相关。' },
+  '免疫系统\n常见疾病':    { code:'B13 · 疾病层', sub:'', group:'', desc:'类风湿、SLE、过敏性疾病。上游药物：解热镇痛抗炎（A2）、抗感染（A9）、皮肤抗过敏（A13）。' },
+  '泌尿系统\n常见疾病':    { code:'B14 · 疾病层', sub:'', group:'', desc:'UTI、肾结石、前列腺增生。上游药物：泌尿系统用药（A7）、抗感染（A9）。' },
+  '肿瘤':                  { code:'B15 · 疾病层', sub:'', group:'', desc:'上游药物：抗肿瘤药（A10）。关联：用药安全（高警示药品）、急救（化疗毒性处理）。' },
+
+  '药学服务\n与药品管理':  { code:'B1 · 药学服务层', sub:'', group:'', desc:'基础：药剂学（贮藏/稳定性）、药事法规。是整个服务层的制度框架。' },
+  '处方审核\n与调剂':      { code:'B2 · 药学服务层', sub:'', group:'', desc:'核心支撑：药动学（配伍/相互作用）、药剂学（配伍禁忌）。承接所有药物的临床落地。' },
+  '用药咨询\n与治疗管理':  { code:'B3 · 药学服务层', sub:'', group:'', desc:'支撑：药动学（剂量调整）、药理毒理学（不良反应咨询）。' },
+  '用药安全':              { code:'B4 · 药学服务层', sub:'', group:'', desc:'不良反应、药物相互作用、高警示药品。核心支撑：药理毒理学、药动学。关联：抗肿瘤药、急救。' },
+  '急救与\n中毒解救':      { code:'B5 · 药学服务层', sub:'', group:'', desc:'急救、中毒解救及职业防护。支撑：药理毒理学（毒理学基础）。关联：抗肿瘤（化疗毒性）。' },
+  '常见病症\n健康管理':    { code:'B6 · 药学服务层', sub:'', group:'', desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛药（发热/疼痛管理）。' },
+  '慢性病\n管理':          { code:'B7 · 药学服务层', sub:'', group:'', desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管用药（A5）、内分泌用药（A8）。支撑：药动学（长期用药调整）。' },
+};
+
+const nodes = [
+  {id:'生命药学',   layer:'found', r:30},
+  {id:'药理毒理学', layer:'found', r:30},
+  {id:'药物化学',   layer:'found', r:28},
+  {id:'药物动力学', layer:'found', r:30},
+  {id:'药剂学',     layer:'found', r:26},
+
+  {id:'受体',     layer:'bridge', r:20},
+  {id:'酶',       layer:'bridge', r:18},
+  {id:'离子通道', layer:'bridge', r:22},
+  {id:'转运体',   layer:'bridge', r:20},
+  {id:'激素',     layer:'bridge', r:18},
+  {id:'病原体',   layer:'bridge', r:20},
+
+  {id:'精神与\n中枢神经用药',  layer:'drug', r:26},
+  {id:'解热镇痛\n抗炎抗风湿',  layer:'drug', r:27},
+  {id:'呼吸系统\n用药',        layer:'drug', r:24},
+  {id:'消化系统\n用药',        layer:'drug', r:24},
+  {id:'心血管系统\n用药',      layer:'drug', r:26},
+  {id:'血液系统\n用药',        layer:'drug', r:24},
+  {id:'泌尿系统\n用药',        layer:'drug', r:24},
+  {id:'内分泌系统\n用药',      layer:'drug', r:26},
+  {id:'抗感染\n药物',          layer:'drug', r:24},
+  {id:'抗肿瘤\n药物',          layer:'drug', r:24},
+  {id:'水电解质\n营养用药',    layer:'drug', r:26},
+  {id:'眼科耳鼻喉\n口腔用药',  layer:'drug', r:27},
+  {id:'皮肤用药\n及抗过敏',    layer:'drug', r:26},
+
+  {id:'呼吸系统\n常见疾病',    layer:'dis', r:25},
+  {id:'心血管系统\n常见疾病',  layer:'dis', r:25},
+  {id:'神经系统\n常见疾病',    layer:'dis', r:25},
+  {id:'消化系统\n常见疾病',    layer:'dis', r:25},
+  {id:'内分泌系统\n常见疾病',  layer:'dis', r:25},
+  {id:'免疫系统\n常见疾病',    layer:'dis', r:25},
+  {id:'泌尿系统\n常见疾病',    layer:'dis', r:25},
+  {id:'肿瘤',                  layer:'dis', r:20},
+
+  {id:'药学服务\n与药品管理',  layer:'svc', r:25},
+  {id:'处方审核\n与调剂',      layer:'svc', r:24},
+  {id:'用药咨询\n与治疗管理',  layer:'svc', r:25},
+  {id:'用药安全',              layer:'svc', r:22},
+  {id:'急救与\n中毒解救',      layer:'svc', r:24},
+  {id:'常见病症\n健康管理',    layer:'svc', r:25},
+  {id:'慢性病\n管理',          layer:'svc', r:22},
+];
+
+const edges = [
+  ['药理毒理学','受体','tree'],['药理毒理学','酶','tree'],['药理毒理学','离子通道','tree'],
+  ['药理毒理学','转运体','tree'],['药理毒理学','激素','tree'],['药理毒理学','病原体','tree'],
+  ['药物化学','受体','tree'],['药物化学','酶','tree'],['药物化学','离子通道','tree'],['药物化学','转运体','tree'],
+  ['生命药学','受体','tree'],['生命药学','激素','tree'],['生命药学','离子通道','tree'],
+
+  ['受体','精神与\n中枢神经用药','tree'],['受体','呼吸系统\n用药','tree'],
+  ['受体','消化系统\n用药','tree'],['受体','心血管系统\n用药','tree'],['受体','解热镇痛\n抗炎抗风湿','tree'],
+  ['酶','解热镇痛\n抗炎抗风湿','tree'],['酶','消化系统\n用药','tree'],['酶','心血管系统\n用药','tree'],
+  ['酶','内分泌系统\n用药','tree'],['酶','抗感染\n药物','tree'],['酶','抗肿瘤\n药物','tree'],
+  ['离子通道','精神与\n中枢神经用药','tree'],['离子通道','心血管系统\n用药','tree'],['离子通道','泌尿系统\n用药','tree'],
+  ['转运体','精神与\n中枢神经用药','tree'],['转运体','泌尿系统\n用药','tree'],['转运体','内分泌系统\n用药','tree'],
+  ['激素','解热镇痛\n抗炎抗风湿','tree'],['激素','内分泌系统\n用药','tree'],['激素','抗肿瘤\n药物','tree'],
+  ['病原体','抗感染\n药物','tree'],
+
+  ['药物动力学','精神与\n中枢神经用药','tree'],['药物动力学','呼吸系统\n用药','tree'],
+  ['药物动力学','心血管系统\n用药','tree'],['药物动力学','内分泌系统\n用药','tree'],
+  ['药物动力学','抗感染\n药物','tree'],['药物动力学','抗肿瘤\n药物','tree'],['药物动力学','水电解质\n营养用药','tree'],
+  ['药剂学','呼吸系统\n用药','tree'],['药剂学','心血管系统\n用药','tree'],
+  ['药剂学','抗感染\n药物','tree'],['药剂学','水电解质\n营养用药','tree'],['药剂学','眼科耳鼻喉\n口腔用药','tree'],
+  ['生命药学','呼吸系统\n用药','tree'],['生命药学','心血管系统\n用药','tree'],
+  ['生命药学','泌尿系统\n用药','tree'],['生命药学','内分泌系统\n用药','tree'],
+
+  ['精神与\n中枢神经用药','神经系统\n常见疾病','tree'],
+  ['呼吸系统\n用药','呼吸系统\n常见疾病','tree'],
+  ['消化系统\n用药','消化系统\n常见疾病','tree'],
+  ['心血管系统\n用药','心血管系统\n常见疾病','tree'],
+  ['血液系统\n用药','心血管系统\n常见疾病','tree'],
+  ['泌尿系统\n用药','泌尿系统\n常见疾病','tree'],
+  ['内分泌系统\n用药','内分泌系统\n常见疾病','tree'],
+  ['抗肿瘤\n药物','肿瘤','tree'],
+
+  ['药物动力学','处方审核\n与调剂','tree'],['药物动力学','用药咨询\n与治疗管理','tree'],['药物动力学','用药安全','tree'],
+  ['药剂学','药学服务\n与药品管理','tree'],['药剂学','处方审核\n与调剂','tree'],
+  ['药理毒理学','用药安全','tree'],['药理毒理学','急救与\n中毒解救','tree'],['药理毒理学','用药咨询\n与治疗管理','tree'],
+  ['生命药学','常见病症\n健康管理','tree'],['生命药学','慢性病\n管理','tree'],
+
+  ['抗感染\n药物','呼吸系统\n常见疾病','net'],
+  ['抗感染\n药物','免疫系统\n常见疾病','net'],
+  ['抗感染\n药物','泌尿系统\n常见疾病','net'],
+  ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','net'],
+  ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','net'],
+  ['心血管系统\n用药','慢性病\n管理','net'],
+  ['内分泌系统\n用药','慢性病\n管理','net'],
+  ['抗肿瘤\n药物','急救与\n中毒解救','net'],
+  ['抗肿瘤\n药物','用药安全','net'],
+  ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
+  ['心血管系统\n常见疾病','慢性病\n管理','net'],
+  ['内分泌系统\n常见疾病','慢性病\n管理','net'],
+  ['解热镇痛\n抗炎抗风湿','常见病症\n健康管理','net'],
+  ['药学服务\n与药品管理','处方审核\n与调剂','net'],
+  ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
+  ['用药咨询\n与治疗管理','用药安全','net'],
+  ['用药安全','急救与\n中毒解救','net'],
+  ['常见病症\n健康管理','慢性病\n管理','net'],
+];
+
+const byLayer = {};
+nodes.forEach(n=>{if(!byLayer[n.layer])byLayer[n.layer]=[];byLayer[n.layer].push(n);});
+Object.entries(byLayer).forEach(([layer,arr])=>{
+  const pad=44, avail=W-pad*2;
+  arr.forEach((n,i)=>{
+    n.x = pad+(arr.length===1?avail/2:avail*i/(arr.length-1));
+    n.y = LY[layer];
+    n.vx=0; n.vy=0; n.ax=0;
+  });
+});
+
+const nmap={};
+nodes.forEach(n=>nmap[n.id]=n);
+const adj={};
+nodes.forEach(n=>{adj[n.id]=[];});
+edges.forEach(([a,b])=>{adj[a].push(b);adj[b].push(a);});
+
+let hoverId=null;
+
+function getPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=W/rect.width;
+  const t=e.touches?e.touches[0]:e;
+  return [(t.clientX-rect.left)*scaleX,(t.clientY-rect.top)*scaleX];
+}
+function nodeAt(x,y){
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i];
+    const dx=x-n.x,dy=y-n.y;
+    if(dx*dx+dy*dy<=(n.r+4)*(n.r+4)) return n;
+  }
+  return null;
+}
+
+function showInfo(n){
+  const info=NODE_INFO[n.id];
+  if(!info) return;
+  const name=n.id.replace(/\n/g,'');
+  document.getElementById('info-title').textContent=name;
+  document.getElementById('info-title').style.color= dark?'#f0ede4':'#1a1a18';
+  document.getElementById('info-code').textContent=info.code+(info.sub?' · '+info.sub:'');
+  document.getElementById('info-body').textContent=info.desc||'';
+  const gi=NODE_INFO[n.id];
+  const gkey=gi&&gi.group&&SYS_GROUPS[gi.group];
+  document.getElementById('info-group').textContent=gkey?'所属系统：'+gkey.name:'';
+}
+function clearInfo(){
+  document.getElementById('info-title').textContent='悬停任意节点查看详情';
+  document.getElementById('info-title').style.color='#999';
+  document.getElementById('info-code').textContent='';
+  document.getElementById('info-body').textContent='';
+  document.getElementById('info-group').textContent='';
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const [x,y]=getPos(e);
+  const n=nodeAt(x,y);
+  canvas.style.cursor=n?'default':'default';
+  if(n&&n.id!==hoverId){hoverId=n.id;showInfo(n);}
+  else if(!n&&hoverId){hoverId=null;clearInfo();}
+});
+canvas.addEventListener('mouseleave',()=>{hoverId=null;clearInfo();});
+
+// Soft physics — nodes gently stay at initial positions, no drag
+function tick(){
+  const repulse=1600, spring=0.03, damp=0.8;
+  nodes.forEach(n=>{
+    const arr=byLayer[n.layer];
+    const idx=arr.indexOf(n);
+    const pad=44, avail=W-pad*2;
+    const tx=pad+(arr.length===1?avail/2:avail*idx/(arr.length-1));
+    let fx=(tx-n.x)*spring;
+    nodes.forEach(m=>{
+      if(m===n||m.layer!==n.layer)return;
+      const dx=n.x-m.x, d=Math.abs(dx)+0.1;
+      const min=n.r+m.r+5;
+      if(d<min) fx+=repulse*(dx/d)/d;
+    });
+    n.vx=(n.vx+fx)*damp;
+    n.x+=n.vx;
+    n.x=Math.max(n.r+4,Math.min(W-n.r-4,n.x));
+    n.y=LY[n.layer];
+  });
+}
+
+function getNodeColor(n){
+  if(n.layer==='found') return C.found;
+  if(n.layer==='bridge') return C.bridge;
+  if(n.layer==='dis') return C.dis;
+  if(n.layer==='svc') return C.svc;
+  // drug layer: use system group color
+  const info=NODE_INFO[n.id];
+  const gkey=info&&info.group;
+  const sg=gkey&&SYS_GROUPS[gkey];
+  if(sg) return {fill:sg.color, stroke:sg.stroke, text: dark?'#e8e4d8':sg.stroke};
+  return {fill: dark?'#1a2b40':'#E6F1FB', stroke:'#185FA5', text: dark?'#B5D4F4':'#042C53'};
+}
+
+function drawText(id, x, y, r, col, isHov){
+  const lines=id.split('\n');
+  const fs=r>25?10:(r>18?9:8);
+  const lh=fs+2.5;
+  ctx.fillStyle=col.text;
+  ctx.font=`${isHov?600:500} ${fs}px var(--font-sans,sans-serif)`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const totalH=lines.length*lh;
+  lines.forEach((ln,i)=>{
+    ctx.fillText(ln, x, y - totalH/2 + lh*i + lh/2);
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=BG;
+  ctx.fillRect(0,0,W,H);
+
+  // Draw system group halos behind drug nodes
+  // Group nodes by sys group, draw a rounded rect behind each cluster
+  const drugNodes=nodes.filter(n=>n.layer==='drug');
+  const groups={};
+  drugNodes.forEach(n=>{
+    const info=NODE_INFO[n.id];
+    const g=info&&info.group;
+    if(!g) return;
+    if(!groups[g]) groups[g]=[];
+    groups[g].push(n);
+  });
+  Object.entries(groups).forEach(([gkey,gnodes])=>{
+    const sg=SYS_GROUPS[gkey];
+    if(!sg||gnodes.length===0) return;
+    const xs=gnodes.map(n=>n.x);
+    const minX=Math.min(...xs), maxX=Math.max(...xs);
+    const pad2=gnodes[0].r+10;
+    const rx=minX-pad2, ry=LY.drug-gnodes[0].r-14;
+    const rw=(maxX-minX)+pad2*2, rh=gnodes[0].r*2+28;
+    // draw bg
+    ctx.beginPath();
+    const brd=10;
+    ctx.moveTo(rx+brd,ry);
+    ctx.lineTo(rx+rw-brd,ry);
+    ctx.quadraticCurveTo(rx+rw,ry,rx+rw,ry+brd);
+    ctx.lineTo(rx+rw,ry+rh-brd);
+    ctx.quadraticCurveTo(rx+rw,ry+rh,rx+rw-brd,ry+rh);
+    ctx.lineTo(rx+brd,ry+rh);
+    ctx.quadraticCurveTo(rx,ry+rh,rx,ry+rh-brd);
+    ctx.lineTo(rx,ry+brd);
+    ctx.quadraticCurveTo(rx,ry,rx+brd,ry);
+    ctx.closePath();
+    ctx.fillStyle=sg.color+(dark?'55':'33');
+    ctx.fill();
+    ctx.strokeStyle=sg.stroke+'44';
+    ctx.lineWidth=0.8;
+    ctx.setLineDash([3,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // group label above
+    ctx.fillStyle=sg.stroke+(dark?'cc':'aa');
+    ctx.font=`500 9px var(--font-sans,sans-serif)`;
+    ctx.textAlign='center';
+    ctx.textBaseline='bottom';
+    ctx.fillText(sg.name, rx+rw/2, ry-1);
+  });
+
+  // Bands
+  BANDS.forEach(b=>{
+    ctx.fillStyle=BAND_ALT;
+    ctx.fillRect(0,b.y,W,b.h);
+    ctx.fillStyle=BAND_LBL;
+    ctx.font=`10px var(--font-sans,sans-serif)`;
+    ctx.textAlign='right';
+    ctx.textBaseline='top';
+    ctx.fillText(b.label, W-8, b.y+4);
+  });
+
+  // Edges
+  edges.forEach(([a,b,type])=>{
+    const na=nmap[a],nb=nmap[b];
+    if(!na||!nb) return;
+    const isConn=hoverId&&(hoverId===a||hoverId===b);
+    ctx.beginPath();
+    if(na.layer===nb.layer){
+      const mx=(na.x+nb.x)/2, my=(na.y+nb.y)/2-26;
+      ctx.moveTo(na.x,na.y);
+      ctx.quadraticCurveTo(mx,my,nb.x,nb.y);
+    } else {
+      ctx.moveTo(na.x,na.y);
+      ctx.lineTo(nb.x,nb.y);
+    }
+    if(type==='net'){
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle=isConn?(dark?'rgba(226,75,74,0.95)':'rgba(216,90,48,0.9)') :(dark?'rgba(216,90,48,0.25)':'rgba(216,90,48,0.28)');
+      ctx.lineWidth=isConn?1.8:0.8;
+    } else {
+      ctx.setLineDash([]);
+      ctx.strokeStyle=isConn?TREE_EH:TREE_E;
+      ctx.lineWidth=isConn?1.4:0.65;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Nodes
+  nodes.forEach(n=>{
+    const col=getNodeColor(n);
+    const isHov=hoverId===n.id;
+    const isNeighbor=hoverId&&adj[hoverId].includes(n.id);
+    const alpha=hoverId?(isHov||isNeighbor?1:0.22):1;
+    ctx.globalAlpha=alpha;
+
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,n.r+(isHov?2:0),0,Math.PI*2);
+    ctx.fillStyle=col.fill;
+    ctx.fill();
+    ctx.strokeStyle=col.stroke;
+    ctx.lineWidth=isHov?2.2:0.8;
+    ctx.stroke();
+
+    drawText(n.id, n.x, n.y, n.r, col, isHov);
+
+    // sub label below for found layer
+    const info=NODE_INFO[n.id];
+    if(info&&info.sub){
+      ctx.font=`400 8.5px var(--font-sans,sans-serif)`;
+      ctx.fillStyle=col.text;
+      ctx.globalAlpha=alpha*0.65;
+      ctx.textAlign='center';
+      ctx.textBaseline='top';
+      ctx.fillText(info.sub, n.x, n.y+n.r+4);
+    }
+    ctx.globalAlpha=1;
+  });
+}
+
+function loop(){tick();draw();requestAnimationFrame(loop);}
+loop();
+</script>
