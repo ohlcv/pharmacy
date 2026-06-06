@@ -167,7 +167,8 @@ canvas{
   transform:translateX(8px);
   transition:all 0.2s ease;
 }
-#legend-wrap:hover #legend{
+#legend-wrap:hover #legend,
+#legend-wrap.show #legend{
   opacity:1;
   visibility:visible;
   transform:translateX(0);
@@ -263,52 +264,72 @@ canvas{
         <div class="leg"><span class="leg-dot" style="background:#4B5563;border-color:#4B5563"></span>肿瘤·专科</div>
       </div>
     </div>
-    <div id="hint-bar">拖拽节点调整布局 · 滚轮缩放</div>
+    <div id="hint-bar">拖拽节点/组调整布局 · 点击节点查看详情 · 滚轮缩放 · 点击右上角图例</div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════
+// PHYSICS CONSTANTS（物理参数统一管理，方便调参）
+// ═══════════════════════════════════════════════════
+// 强力参数
+let S_REPULSE_K = 45000;   // 近程排斥强度
+let S_TARGET_F  = 1.8;     // 平衡距离 = minDist × 此值
+let S_RANGE     = 580;     // 强力射程
+let S_DECAY     = 1.1;     // 射程内指数衰减系数
+let S_ALPHA     = 0.35;    // 中程吸引力系数
+let S_DAMP      = 0.95;    // 同类节点内部阻尼
+// 电磁力参数
+let EM_K        = 15000;   // 电磁力强度系数
+let EM_RANGE    = 350;     // 电磁力作用范围
+let EM_MAX_F    = 22;      // 电磁力上限
+// 层势阱参数
+let G_WELL_K    = 0.08;    // 层势阱引力系数
+let G_CORE_REP  = 50000;   // 层核之间排斥常量
+
+// ═══════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════
+// NODE INFO（ID与显示名分离）
+// ═══════════════════════════════════════════════════
 const NODE_INFO={
-  '生命药学':{code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
-  '药理毒理学':{code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
-  '药物化学':{code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
-  '药物动力学':{code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
-  '药剂学':{code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
-  '受体':{code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
-  '酶':{code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
-  '离子通道':{code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
-  '转运体':{code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
-  '激素':{code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
-  '病原体':{code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
-  '精神与\n中枢神经用药':{code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
-  '神经系统\n常见疾病':{code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
-  '呼吸系统\n用药':{code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
-  '呼吸系统\n常见疾病':{code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
-  '消化系统\n用药':{code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
-  '消化系统\n常见疾病':{code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
-  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
-  '血液系统\n用药':{code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
-  '心血管系统\n常见疾病':{code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
-  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
-  '内分泌系统\n常见疾病':{code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
-  '泌尿系统\n用药':{code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
-  '水电解质\n营养用药':{code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
-  '泌尿系统\n常见疾病':{code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
-  '抗感染\n药物':{code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
-  '解热镇痛\n抗炎抗风湿':{code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
-  '皮肤用药\n及抗过敏':{code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
-  '免疫系统\n常见疾病':{code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
-  '抗肿瘤\n药物':{code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
-  '肿瘤':{code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
-  '眼科耳鼻喉\n口腔用药':{code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
-  '慢病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
-  '用药安全':{code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
-  '处方审核\n与调剂':{code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
-  '用药咨询\n与治疗管理':{code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
-  '常见病症\n健康管理':{code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
+  pharm_toxicology:{label:'药理毒理学',code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
+  life_pharmacy:{label:'生命药学',code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
+  med_chemistry:{label:'药物化学',code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
+  pharmacokinetics:{label:'药物动力学',code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
+  pharmaceutics:{label:'药剂学',code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
+  receptor:{label:'受体',code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
+  enzyme:{label:'酶',code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
+  ion_channel:{label:'离子通道',code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
+  transporter:{label:'转运体',code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
+  hormone:{label:'激素',code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
+  pathogen:{label:'病原体',code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
+  neuro_drug:{label:'精神与中枢神经用药',code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
+  neuro_disease:{label:'神经系统常见疾病',code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
+  resp_drug:{label:'呼吸系统用药',code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
+  resp_disease:{label:'呼吸系统常见疾病',code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
+  digest_drug:{label:'消化系统用药',code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
+  digest_disease:{label:'消化系统常见疾病',code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
+  cardio_drug:{label:'心血管系统用药',code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
+  blood_drug:{label:'血液系统用药',code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
+  cardio_disease:{label:'心血管系统常见疾病',code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
+  endo_drug:{label:'内分泌系统用药',code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
+  endo_disease:{label:'内分泌系统常见疾病',code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
+  uro_drug:{label:'泌尿系统用药',code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
+  fluid_nutrition:{label:'水电解质营养用药',code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
+  uro_disease:{label:'泌尿系统常见疾病',code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
+  anti_infective:{label:'抗感染药物',code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
+  antipyretic_analgesic:{label:'解热镇痛抗炎抗风湿',code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
+  skin_drug:{label:'皮肤用药及抗过敏',code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
+  immuno_disease:{label:'免疫系统常见疾病',code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
+  anticancer:{label:'抗肿瘤药物',code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
+  cancer:{label:'肿瘤',code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
+  ent_drug:{label:'眼科耳鼻喉口腔用药',code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
+  chronic_disease:{label:'慢病管理',code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
+  drug_safety:{label:'用药安全',code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
+  prescription:{label:'处方审核与调剂',code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
+  consultation:{label:'用药咨询与治疗管理',code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
+  common_health:{label:'常见病症健康管理',code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
 };
 
 const CATEGORY_COLORS={
@@ -346,110 +367,110 @@ const CATEGORY_BG={
 const LAYER_Y={foundation:0.12, bridge:0.35, clinical:0.62, service:0.88};
 
 const rawNodes=[
-  {id:'药理毒理学',layer:'foundation',r:40,category:'foundation'},
-  {id:'生命药学',layer:'foundation',r:28,category:'foundation'},
-  {id:'药物化学',layer:'foundation',r:26,category:'foundation'},
-  {id:'药物动力学',layer:'foundation',r:30,category:'foundation'},
-  {id:'药剂学',layer:'foundation',r:26,category:'foundation'},
-  {id:'受体',layer:'bridge',r:25,category:'bridge'},
-  {id:'酶',layer:'bridge',r:23,category:'bridge'},
-  {id:'离子通道',layer:'bridge',r:25,category:'bridge'},
-  {id:'转运体',layer:'bridge',r:22,category:'bridge'},
-  {id:'激素',layer:'bridge',r:21,category:'bridge'},
-  {id:'病原体',layer:'bridge',r:21,category:'bridge'},
-  {id:'精神与\n中枢神经用药',layer:'clinical',r:26,category:'neuro'},
-  {id:'神经系统\n常见疾病',layer:'clinical',r:24,category:'neuro'},
-  {id:'呼吸系统\n用药',layer:'clinical',r:22,category:'resp'},
-  {id:'呼吸系统\n常见疾病',layer:'clinical',r:22,category:'resp'},
-  {id:'消化系统\n用药',layer:'clinical',r:22,category:'digest'},
-  {id:'消化系统\n常见疾病',layer:'clinical',r:22,category:'digest'},
-  {id:'心血管系统\n用药',layer:'clinical',r:28,category:'cardio'},
-  {id:'血液系统\n用药',layer:'clinical',r:24,category:'cardio'},
-  {id:'内分泌系统\n用药',layer:'clinical',r:26,category:'endo'},
-  {id:'心血管系统\n常见疾病',layer:'clinical',r:24,category:'cardio'},
-  {id:'内分泌系统\n常见疾病',layer:'clinical',r:24,category:'endo'},
-  {id:'泌尿系统\n用药',layer:'clinical',r:22,category:'uro'},
-  {id:'水电解质\n营养用药',layer:'clinical',r:22,category:'uro'},
-  {id:'泌尿系统\n常见疾病',layer:'clinical',r:22,category:'uro'},
-  {id:'抗感染\n药物',layer:'clinical',r:25,category:'immuno'},
-  {id:'解热镇痛\n抗炎抗风湿',layer:'clinical',r:25,category:'immuno'},
-  {id:'皮肤用药\n及抗过敏',layer:'clinical',r:22,category:'immuno'},
-  {id:'免疫系统\n常见疾病',layer:'clinical',r:22,category:'immuno'},
-  {id:'抗肿瘤\n药物',layer:'clinical',r:23,category:'onco'},
-  {id:'肿瘤',layer:'clinical',r:21,category:'onco'},
-  {id:'眼科耳鼻喉\n口腔用药',layer:'clinical',r:22,category:'special'},
-  {id:'慢病\n管理',layer:'service',r:27,category:'service'},
-  {id:'用药安全',layer:'service',r:25,category:'service'},
-  {id:'处方审核\n与调剂',layer:'service',r:24,category:'service'},
-  {id:'用药咨询\n与治疗管理',layer:'service',r:24,category:'service'},
-  {id:'常见病症\n健康管理',layer:'service',r:24,category:'service'},
+  {id:'pharm_toxicology',layer:'foundation',r:40,category:'foundation'},
+  {id:'life_pharmacy',layer:'foundation',r:28,category:'foundation'},
+  {id:'med_chemistry',layer:'foundation',r:26,category:'foundation'},
+  {id:'pharmacokinetics',layer:'foundation',r:30,category:'foundation'},
+  {id:'pharmaceutics',layer:'foundation',r:26,category:'foundation'},
+  {id:'receptor',layer:'bridge',r:25,category:'bridge'},
+  {id:'enzyme',layer:'bridge',r:23,category:'bridge'},
+  {id:'ion_channel',layer:'bridge',r:25,category:'bridge'},
+  {id:'transporter',layer:'bridge',r:22,category:'bridge'},
+  {id:'hormone',layer:'bridge',r:21,category:'bridge'},
+  {id:'pathogen',layer:'bridge',r:21,category:'bridge'},
+  {id:'neuro_drug',layer:'clinical',r:26,category:'neuro'},
+  {id:'neuro_disease',layer:'clinical',r:24,category:'neuro'},
+  {id:'resp_drug',layer:'clinical',r:22,category:'resp'},
+  {id:'resp_disease',layer:'clinical',r:22,category:'resp'},
+  {id:'digest_drug',layer:'clinical',r:22,category:'digest'},
+  {id:'digest_disease',layer:'clinical',r:22,category:'digest'},
+  {id:'cardio_drug',layer:'clinical',r:28,category:'cardio'},
+  {id:'blood_drug',layer:'clinical',r:24,category:'cardio'},
+  {id:'endo_drug',layer:'clinical',r:26,category:'endo'},
+  {id:'cardio_disease',layer:'clinical',r:24,category:'cardio'},
+  {id:'endo_disease',layer:'clinical',r:24,category:'endo'},
+  {id:'uro_drug',layer:'clinical',r:22,category:'uro'},
+  {id:'fluid_nutrition',layer:'clinical',r:22,category:'uro'},
+  {id:'uro_disease',layer:'clinical',r:22,category:'uro'},
+  {id:'anti_infective',layer:'clinical',r:25,category:'immuno'},
+  {id:'antipyretic_analgesic',layer:'clinical',r:25,category:'immuno'},
+  {id:'skin_drug',layer:'clinical',r:22,category:'immuno'},
+  {id:'immuno_disease',layer:'clinical',r:22,category:'immuno'},
+  {id:'anticancer',layer:'clinical',r:23,category:'onco'},
+  {id:'cancer',layer:'clinical',r:21,category:'onco'},
+  {id:'ent_drug',layer:'clinical',r:22,category:'special'},
+  {id:'chronic_disease',layer:'service',r:27,category:'service'},
+  {id:'drug_safety',layer:'service',r:25,category:'service'},
+  {id:'prescription',layer:'service',r:24,category:'service'},
+  {id:'consultation',layer:'service',r:24,category:'service'},
+  {id:'common_health',layer:'service',r:24,category:'service'},
 ];
 
 const rawEdges=[
-  ['药理毒理学','受体','main'],['药理毒理学','酶','main'],['药理毒理学','离子通道','main'],
-  ['药理毒理学','转运体','main'],['药理毒理学','激素','main'],['药理毒理学','病原体','main'],
-  ['药物化学','受体','main'],['药物化学','酶','main'],['药物化学','离子通道','main'],
-  ['生命药学','受体','main'],['生命药学','激素','main'],['生命药学','离子通道','main'],
-  ['受体','精神与\n中枢神经用药','main'],['受体','心血管系统\n用药','main'],['受体','内分泌系统\n用药','main'],
-  ['酶','心血管系统\n用药','main'],['酶','内分泌系统\n用药','main'],['酶','抗感染\n药物','main'],
-  ['酶','抗肿瘤\n药物','main'],['酶','解热镇痛\n抗炎抗风湿','main'],
-  ['离子通道','精神与\n中枢神经用药','main'],['离子通道','心血管系统\n用药','main'],['离子通道','泌尿系统\n用药','main'],
-  ['转运体','精神与\n中枢神经用药','main'],['转运体','内分泌系统\n用药','main'],
-  ['激素','内分泌系统\n用药','main'],['激素','抗肿瘤\n药物','main'],['激素','解热镇痛\n抗炎抗风湿','main'],
-  ['病原体','抗感染\n药物','main'],
-  ['受体','呼吸系统\n用药','main'],['受体','消化系统\n用药','main'],
-  ['受体','皮肤用药\n及抗过敏','main'],['受体','泌尿系统\n用药','main'],
-  ['精神与\n中枢神经用药','神经系统\n常见疾病','main'],
-  ['呼吸系统\n用药','呼吸系统\n常见疾病','main'],
-  ['消化系统\n用药','消化系统\n常见疾病','main'],
-  ['心血管系统\n用药','心血管系统\n常见疾病','main'],
-  ['血液系统\n用药','心血管系统\n常见疾病','main'],
-  ['内分泌系统\n用药','内分泌系统\n常见疾病','main'],
-  ['泌尿系统\n用药','泌尿系统\n常见疾病','main'],
-  ['抗感染\n药物','免疫系统\n常见疾病','main'],
-  ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','main'],
-  ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','main'],
-  ['抗肿瘤\n药物','肿瘤','main'],
-  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢病\n管理','main'],
-  ['药剂学','处方审核\n与调剂','main'],['药理毒理学','用药安全','main'],
-  ['生命药学','常见病症\n健康管理','main'],
-  ['心血管系统\n用药','内分泌系统\n用药','net'],
-  ['心血管系统\n用药','慢病\n管理','net'],
-  ['内分泌系统\n用药','慢病\n管理','net'],
-  ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
-  ['抗感染\n药物','呼吸系统\n常见疾病','net'],
-  ['抗感染\n药物','泌尿系统\n常见疾病','net'],
-  ['解热镇痛\n抗炎抗风湿','常见病症\n健康管理','net'],
-  ['抗肿瘤\n药物','用药安全','net'],
-  ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
-  ['用药咨询\n与治疗管理','用药安全','net'],
+  ['pharm_toxicology','receptor','main'],['pharm_toxicology','enzyme','main'],['pharm_toxicology','ion_channel','main'],
+  ['pharm_toxicology','transporter','main'],['pharm_toxicology','hormone','main'],['pharm_toxicology','pathogen','main'],
+  ['med_chemistry','receptor','main'],['med_chemistry','enzyme','main'],['med_chemistry','ion_channel','main'],
+  ['life_pharmacy','receptor','main'],['life_pharmacy','hormone','main'],['life_pharmacy','ion_channel','main'],
+  ['receptor','neuro_drug','main'],['receptor','cardio_drug','main'],['receptor','endo_drug','main'],
+  ['enzyme','cardio_drug','main'],['enzyme','endo_drug','main'],['enzyme','anti_infective','main'],
+  ['enzyme','anticancer','main'],['enzyme','antipyretic_analgesic','main'],
+  ['ion_channel','neuro_drug','main'],['ion_channel','cardio_drug','main'],['ion_channel','uro_drug','main'],
+  ['transporter','neuro_drug','main'],['transporter','endo_drug','main'],
+  ['hormone','endo_drug','main'],['hormone','anticancer','main'],['hormone','antipyretic_analgesic','main'],
+  ['pathogen','anti_infective','main'],
+  ['receptor','resp_drug','main'],['receptor','digest_drug','main'],
+  ['receptor','skin_drug','main'],['receptor','uro_drug','main'],
+  ['neuro_drug','neuro_disease','main'],
+  ['resp_drug','resp_disease','main'],
+  ['digest_drug','digest_disease','main'],
+  ['cardio_drug','cardio_disease','main'],
+  ['blood_drug','cardio_disease','main'],
+  ['endo_drug','endo_disease','main'],
+  ['uro_drug','uro_disease','main'],
+  ['anti_infective','immuno_disease','main'],
+  ['antipyretic_analgesic','immuno_disease','main'],
+  ['skin_drug','immuno_disease','main'],
+  ['anticancer','cancer','main'],
+  ['pharmacokinetics','prescription','main'],['pharmacokinetics','consultation','main'],['pharmacokinetics','chronic_disease','main'],
+  ['pharmaceutics','prescription','main'],['pharm_toxicology','drug_safety','main'],
+  ['life_pharmacy','common_health','main'],
+  ['cardio_drug','endo_drug','net'],
+  ['cardio_drug','chronic_disease','net'],
+  ['endo_drug','chronic_disease','net'],
+  ['cardio_disease','endo_disease','net'],
+  ['anti_infective','resp_disease','net'],
+  ['anti_infective','uro_disease','net'],
+  ['antipyretic_analgesic','common_health','net'],
+  ['anticancer','drug_safety','net'],
+  ['prescription','consultation','net'],
+  ['consultation','drug_safety','net'],
   // V4.1: 修复孤立节点和增强连通性
-  ['药剂学','眼科耳鼻喉\n口腔用药','main'],
-  ['受体','眼科耳鼻喉\n口腔用药','main'],
-  ['病原体','眼科耳鼻喉\n口腔用药','main'],
-  ['眼科耳鼻喉\n口腔用药','常见病症\n健康管理','net'],
-  ['药物动力学','水电解质\n营养用药','main'],
-  ['水电解质\n营养用药','泌尿系统\n常见疾病','main'],
-  ['药物动力学','用药安全','main'],
-  ['心血管系统\n用药','用药安全','net'],
-  ['内分泌系统\n用药','用药安全','net'],
-  ['抗感染\n药物','用药安全','net'],
+  ['pharmaceutics','ent_drug','main'],
+  ['receptor','ent_drug','main'],
+  ['pathogen','ent_drug','main'],
+  ['ent_drug','common_health','net'],
+  ['pharmacokinetics','fluid_nutrition','main'],
+  ['fluid_nutrition','uro_disease','main'],
+  ['pharmacokinetics','drug_safety','main'],
+  ['cardio_drug','drug_safety','net'],
+  ['endo_drug','drug_safety','net'],
+  ['anti_infective','drug_safety','net'],
 ];
 
 // System groupings for background frames
 const CATEGORY_GROUPS={
-  foundation:['药理毒理学','生命药学','药物化学','药物动力学','药剂学'],
-  bridge:['受体','酶','离子通道','转运体','激素','病原体'],
-  neuro: ['精神与\n中枢神经用药','神经系统\n常见疾病'],
-  resp:  ['呼吸系统\n用药','呼吸系统\n常见疾病'],
-  digest:['消化系统\n用药','消化系统\n常见疾病'],
-  cardio:['心血管系统\n用药','血液系统\n用药','心血管系统\n常见疾病'],
-  endo:  ['内分泌系统\n用药','内分泌系统\n常见疾病'],
-  uro:   ['泌尿系统\n用药','水电解质\n营养用药','泌尿系统\n常见疾病'],
-  immuno:['抗感染\n药物','解热镇痛\n抗炎抗风湿','皮肤用药\n及抗过敏','免疫系统\n常见疾病'],
-  onco:  ['抗肿瘤\n药物','肿瘤'],
-  special:['眼科耳鼻喉\n口腔用药'],
-  service:['慢病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理'],
+  foundation:['pharm_toxicology','life_pharmacy','med_chemistry','pharmacokinetics','pharmaceutics'],
+  bridge:['receptor','enzyme','ion_channel','transporter','hormone','pathogen'],
+  neuro: ['neuro_drug','neuro_disease'],
+  resp:  ['resp_drug','resp_disease'],
+  digest:['digest_drug','digest_disease'],
+  cardio:['cardio_drug','blood_drug','cardio_disease'],
+  endo:  ['endo_drug','endo_disease'],
+  uro:   ['uro_drug','fluid_nutrition','uro_disease'],
+  immuno:['anti_infective','antipyretic_analgesic','skin_drug','immuno_disease'],
+  onco:  ['anticancer','cancer'],
+  special:['ent_drug'],
+  service:['chronic_disease','drug_safety','prescription','consultation','common_health'],
 };
 
 const CATEGORY_LABELS={
@@ -567,28 +588,7 @@ function runForce(steps){
 
   // ── 强相互作用力 ──────────────────────────────
   // 同类节点间：近排远吸，作用范围有限，有明确平衡距离
-  // 调整：增强排斥力，防止节点重叠
-  const S_REPULSE_K = 45000;   // 近程排斥强度（大幅增强）
-  const S_TARGET_F  = 1.8;     // 平衡距离 = minDist × 此值（同类节点理想间距）
-  const S_RANGE     = 580;     // 强力射程（增大，让远程同类也有吸引力）
-  const S_DECAY     = 1.1;     // 射程内指数衰减系数（减小，保持远程吸引力）
-  const S_ALPHA     = 0.35;    // 中程吸引力系数（增强，让同类更紧密聚集）
-  const S_DAMP      = 0.95;    // 同类节点内部阻尼（防止被瞬间撕裂）
-
-  // ── 电磁力（类别电荷模型）────────────────────
-  // 节点携带类别电荷：q_c = √N_c（类别节点数的平方根）
-  // 同层不同类：同极相斥（q_i × q_j > 0）
-  // 异层同类：异极相吸（q_i × q_j < 0）
-  // 物理实现：节点级；视觉结果：类别级
-  const EM_K        = 15000;   // 电磁力强度系数（降低，减少对同类团块的干扰）
-  const EM_RANGE    = 350;     // 电磁力作用范围（缩小，只影响邻近异类）
-  const EM_MAX_F    = 22;      // 电磁力上限（降低，避免撕裂同类团块）
-
-  // ── 层势阱（Gravity）────────────────────────
-  // 节点被本层势阱吸引，但不固定Y坐标
-  // 层与层之间可以自由浮动
-  const G_WELL_K    = 0.08;    // 层势阱引力系数
-  const G_CORE_REP  = 50000;   // 层核之间排斥常量
+  // 物理参数已提升到模块顶部统一管理
   const G_CORE_DAMP = 0.78;    // 层核速度阻尼
 
   // ── 弱相互作用力 ──────────────────────────────
@@ -792,6 +792,11 @@ function runForce(steps){
       n.y=Math.max(pad+n.r, Math.min(H-pad-n.r, n.y));
     });
   }
+  
+  // 计算总运动能量
+  totalEnergy=nodes.reduce((sum,n)=>sum+Math.sqrt(n.vx*n.vx+n.vy*n.vy),0);
+  framesDirty=true;  // 标记帧缓存需要更新
+  return totalEnergy;
 }
 
 // ═══════════════════════════════════════════════════
@@ -799,8 +804,7 @@ function runForce(steps){
 // ═══════════════════════════════════════════════════
 let hovered=null;
 let locked=null;       // locked node id
-let activeSystem=null; // system filter
-let searchQuery='';
+// let activeSystem=null; // system filter (已禁用)
 let drag=null;         // {node, ox, oy}
 
 // Pan / zoom
@@ -834,7 +838,7 @@ function showPanel(nodeId, mouseX, mouseY){
   let px = mouseX + 15;
   let py = mouseY + 15;
   const panelW = 220;
-  const panelH = 200; // 估算高度
+  const panelH = panel.offsetHeight || 200; // 动态读取实际高度
   if(px + panelW > W - 10) px = mouseX - panelW - 15;
   if(py + panelH > H - 10) py = mouseY - panelH - 15;
   panel.style.left = px + 'px';
@@ -843,9 +847,9 @@ function showPanel(nodeId, mouseX, mouseY){
   panel.classList.add('visible');
   const info=NODE_INFO[nodeId]||{};
   const n=nmap[nodeId];
-  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.core;
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
 
-  document.getElementById('info-panel-name').textContent=nodeId.replace(/\n/g,' ');
+  document.getElementById('info-panel-name').textContent=info.label||nodeId;
 
   const codeEl=document.getElementById('info-panel-code');
   codeEl.textContent=info.code||'';
@@ -869,10 +873,10 @@ function showPanel(nodeId, mouseX, mouseY){
     });
     let html='';
     if(upstream.length){
-      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,' ')}</span>`).join('')}</div>`;
+      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${NODE_INFO[id]?.label||id}</span>`).join('')}</div>`;
     }
     if(downstream.length){
-      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,' ')}</span>`).join('')}</div>`;
+      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${NODE_INFO[id]?.label||id}</span>`).join('')}</div>`;
     }
     linksEl.innerHTML=html;
   } else {
@@ -900,6 +904,28 @@ function computeGroupFrames(){
   });
   return frames;
 }
+
+// ═══════════════════════════════════════════════════
+// CACHE & OPTIMIZATION
+// ═══════════════════════════════════════════════════
+// 缓存：只在下一次物理迭代前失效
+let cachedFrames=null;
+let framesDirty=true;
+
+function getGroupFrames(){
+  if(framesDirty){
+    cachedFrames=computeGroupFrames();
+    framesDirty=false;
+  }
+  return cachedFrames;
+}
+
+// 运动能量检测：低于阈值时暂停渲染循环
+let totalEnergy=Infinity;
+let lastRenderTime=0;
+let isSleeping=false;
+const ENERGY_THRESHOLD=0.5;  // 总能量阈值
+const MIN_DELTA_TIME=16;      // 最小帧间隔(ms)
 
 function drawGroupBg(frames){
   Object.entries(frames).forEach(([sys,f])=>{
@@ -970,7 +996,7 @@ function drawNode(n,highlighted){
   const isLocked=locked===n.id;
   const isActive=!highlighted||highlighted.has(n.id);
   const isSysFilter=!activeSystem||(CATEGORY_GROUPS[activeSystem]||[]).includes(n.id)
-    ||(n.category==='core'||n.category==='bridge');
+    ||(n.category==='bridge');
 
   ctx.save();
   let alpha=1;
@@ -980,7 +1006,7 @@ function drawNode(n,highlighted){
 
   const scale=isHovered||isLocked?1.12:1;
   const nodeR=n.r*scale;
-  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.core;
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
 
   if(isHovered||isLocked){
     ctx.shadowColor=colors.stroke+'55';
@@ -1022,18 +1048,30 @@ function drawNode(n,highlighted){
   ctx.font=(isHovered||isLocked?'700':'500')+' '+fontSize+'px Noto Sans SC,sans-serif';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  const lines=n.id.split('\n');
-  const lh=fontSize+3;
-  lines.forEach((line,i)=>{
-    ctx.fillText(line,n.x,n.y-(lines.length-1)*lh/2+i*lh);
+  const label=NODE_INFO[n.id]?.label||n.id;
+  // 按词语换行（每2-4个字一行，根据节点大小调整）
+  const maxChars=n.r>28?4:n.r>22?3:2;
+  const words=label.match(new RegExp('.{1,'+maxChars+'}','g'))||[label];
+  const lh=fontSize+2;
+  words.forEach((line,i)=>{
+    ctx.fillText(line,n.x,n.y-(words.length-1)*lh/2+i*lh);
   });
 
   ctx.restore();
 }
 
 function lighten(hex,amt){
-  // simple: return color as-is (already light fills)
-  return hex;
+  // 将hex颜色变亮amt（0-1），返回新的hex
+  // 支持 #RRGGBB 格式
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  const nr=Math.min(255, Math.round(r + (255-r)*amt));
+  const ng=Math.min(255, Math.round(g + (255-g)*amt));
+  const nb=Math.min(255, Math.round(b + (255-b)*amt));
+  return '#' + nr.toString(16).padStart(2,'0')
+             + ng.toString(16).padStart(2,'0')
+             + nb.toString(16).padStart(2,'0');
 }
 
 function render(){
@@ -1047,7 +1085,7 @@ function render(){
   ctx.translate(pan.x,pan.y);
   ctx.scale(zoom,zoom);
 
-  const frames=computeGroupFrames();
+  const frames=getGroupFrames();  // 使用缓存的frames
 
   // Active system highlight overlay
   if(activeSystem){
@@ -1067,7 +1105,7 @@ function render(){
   if(activeSystem){
     sysSet=new Set(CATEGORY_GROUPS[activeSystem]||[]);
     // always show core/bridge
-    nodes.forEach(n=>{if(n.category==='core'||n.category==='bridge')sysSet.add(n.id);});
+    nodes.forEach(n=>{if(n.category==='bridge')sysSet.add(n.id);});
   }
 
   // Edges
@@ -1081,7 +1119,26 @@ function render(){
 
   ctx.restore();
 
-  requestAnimationFrame(render);
+  // 运动能量检测：节点稳定时暂停渲染
+  const now=performance.now();
+  if(isSleeping){
+    // 睡眠中，等待交互唤醒
+  } else if(totalEnergy < ENERGY_THRESHOLD && now - lastRenderTime > 100){
+    // 能量低且超过100ms，暂停渲染
+    isSleeping=true;
+  } else {
+    lastRenderTime=now;
+    requestAnimationFrame(render);
+  }
+}
+
+// 交互时唤醒渲染循环
+function wakeUpRender(){
+  if(isSleeping){
+    isSleeping=false;
+    lastRenderTime=performance.now();
+    requestAnimationFrame(render);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1098,7 +1155,7 @@ function getNodeAt(cx,cy){
 
 function getGroupAt(cx,cy){
   const {x,y}=toWorld(cx,cy);
-  const frames=computeGroupFrames();
+  const frames=getGroupFrames();  // 使用缓存
   for(const [sys,f] of Object.entries(frames)){
     if(x>=f.minX && x<=f.maxX && y>=f.minY && y<=f.maxY){
       return {sys, frame:f};
@@ -1118,6 +1175,12 @@ canvas.addEventListener('mousemove',e=>{
       drag.node.x=x;
       drag.node.y=y;
       drag.node.vx=0;drag.node.vy=0;
+      // 锁定状态下跟随节点移动
+      if(locked===drag.node.id){
+        const screenX=drag.node.x*zoom+pan.x;
+        const screenY=drag.node.y*zoom+pan.y;
+        showPanel(locked,screenX,screenY);
+      }
     } else if(drag.type==='group'){
       // 先获取旧的框位置（在移动任何节点之前）
       const oldFrame=computeGroupFrames()[drag.sys];
@@ -1145,12 +1208,19 @@ canvas.addEventListener('mousemove',e=>{
   }
 
   const n=getNodeAt(cx,cy);
+  if(n){
+    hovered=n.id;
+    canvas.style.cursor='pointer';
+    if(!locked)showPanel(n.id, cx, cy);
+    return;
+  }
+  // 未命中节点才检查group
   const group=getGroupAt(cx,cy);
-  hovered=n?n.id:null;
-  canvas.style.cursor=n||group?'pointer':'default';
+  hovered=null;
+  canvas.style.cursor=group?'pointer':'default';
 
   if(!locked){
-    showPanel(n?n.id:null, cx, cy);
+    showPanel(null, cx, cy);
   }
 });
 
@@ -1169,6 +1239,7 @@ canvas.addEventListener('click',e=>{
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0)return;
+  wakeUpRender();  // 交互时唤醒渲染循环
   const rect=canvas.getBoundingClientRect();
   const cx=e.clientX-rect.left;
   const cy=e.clientY-rect.top;
@@ -1230,6 +1301,7 @@ canvas.addEventListener('mouseleave',()=>{
 
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
+  wakeUpRender();  // 交互时唤醒渲染循环
   const rect=canvas.getBoundingClientRect();
   const mx=e.clientX-rect.left;
   const my=e.clientY-rect.top;
@@ -1244,12 +1316,21 @@ canvas.addEventListener('wheel',e=>{
 // CONTROLS
 // ═══════════════════════════════════════════════════
 
-// Hide hint bar after 3s
+// 图例点击toggle（支持移动端）
+const legendWrap=document.getElementById('legend-wrap');
+legendWrap.addEventListener('click',()=>{
+  legendWrap.classList.toggle('show');
+});
+
+// 删除系统筛选功能（无UI入口）
+let activeSystem=null;
+
+// Hide hint bar after 5s
 setTimeout(()=>{
   const h=document.getElementById('hint-bar');
   h.style.opacity='0';
   setTimeout(()=>h.style.display='none',400);
-},3000);
+},5000);
 
 // ═══════════════════════════════════════════════════
 // INIT
@@ -1258,7 +1339,6 @@ resize();
 render();
 
 window.addEventListener('resize',()=>{
-  pan={x:0,y:0};zoom=1;
   resize();
 });
 </script>
