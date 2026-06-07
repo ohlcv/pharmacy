@@ -63,6 +63,16 @@ body{
 #header-sub{
   font-size:11px;
   color:var(--text-muted);
+  min-height:1.3em;
+  text-align:center;
+}
+#header-sub-text{
+  display:inline-block;
+  opacity:1;
+  transition:opacity 0.45s ease;
+}
+#header-sub-text.is-hidden{
+  opacity:0;
 }
 
 /* ── Search bar ── */
@@ -273,20 +283,22 @@ canvas{
   transform:translateY(0);
 }
 
-/* ── Hint overlay ── */
+/* ── Hint overlay (center splash, highest layer) ── */
 #hint-bar{
   position:absolute;
-  top:10px;
+  top:50%;
   left:50%;
-  transform:translateX(-50%);
-  background:rgba(26,32,44,0.75);
-  color:rgba(255,255,255,0.85);
-  font-size:11px;
-  padding:5px 14px;
-  border-radius:20px;
+  transform:translate(-50%,-50%);
+  z-index:200;
+  background:rgba(26,32,44,0.82);
+  color:rgba(255,255,255,0.92);
+  font-size:12px;
+  padding:10px 20px;
+  border-radius:24px;
   pointer-events:none;
   white-space:nowrap;
-  backdrop-filter:blur(4px);
+  backdrop-filter:blur(6px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.18);
   transition:opacity 0.3s;
 }
 </style>
@@ -296,7 +308,7 @@ canvas{
   <div id="header">
     <div id="header-center">
       <div id="header-title">药学知识拓扑图</div>
-      <div id="header-sub">四力引擎 · 同类聚束 · 层势阱 · 临床层二维展开</div>
+      <div id="header-sub"><span id="header-sub-text">四力引擎</span></div>
     </div>
   </div>
 
@@ -357,8 +369,8 @@ canvas{
       </div>
     </div>
 
-    <div id="hint-bar">空白处拖动平移 · 节点/分组可拖拽 · 滚轮缩放 · 点击节点查看详情</div>
     <div id="search-badge"></div>
+    <div id="hint-bar">空白处拖动平移 · 节点/分组可拖拽 · 滚轮缩放 · 点击节点查看详情</div>
   </div>
 </div>
 
@@ -1648,12 +1660,36 @@ canvas.addEventListener('wheel',e=>{
   });
 })();
 
-// Hide hint bar after 4s
+// ── Header subtitle carousel ──
+(function(){
+  const MESSAGES=[
+    '四力引擎','同类聚束','层引势阱','二维展开','电磁斥力',
+    '二跳高亮','跨层连边','系统分组','贝塞尔线','多层拓扑',
+    '节点锁定','分组拖拽','捏合缩放','实时搜索','上下游链',
+  ];
+  const el=document.getElementById('header-sub-text');
+  const SHOW_MS=2800;
+  const FADE_MS=450;
+  let idx=0;
+
+  function cycle(){
+    el.classList.add('is-hidden');
+    setTimeout(()=>{
+      idx=(idx+1)%MESSAGES.length;
+      el.textContent=MESSAGES[idx];
+      el.classList.remove('is-hidden');
+    }, FADE_MS);
+  }
+
+  setInterval(cycle, SHOW_MS);
+})();
+
+// Hide hint bar after 3s
 setTimeout(()=>{
   const h=document.getElementById('hint-bar');
   h.style.opacity='0';
-  setTimeout(()=>h.style.display='none',400);
-},4500);
+  setTimeout(()=>h.style.display='none',300);
+},3000);
 
 // ═══════════════════════════════════════════════════
 // INIT
