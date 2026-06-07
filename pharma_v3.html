@@ -235,6 +235,11 @@ canvas{
   display:flex;
   align-items:center;
   gap:8px;
+  pointer-events:none;
+}
+#canvas-toolbar .tool-btn,
+#canvas-toolbar #search-wrap{
+  pointer-events:auto;
 }
 .tool-btn{
   width:32px;height:32px;
@@ -260,9 +265,11 @@ canvas{
   flex-direction:column;
   align-items:flex-end;
   gap:6px;
+  pointer-events:none;
 }
 #legend-toggle{
   order:1;
+  pointer-events:auto;
   width:32px;
   height:32px;
   border-radius:8px;
@@ -305,6 +312,7 @@ canvas{
   opacity:1;
   visibility:visible;
   transform:translateY(0);
+  pointer-events:auto;
 }
 
 /* ── Hint overlay (center splash, highest layer) ── */
@@ -1240,13 +1248,21 @@ function render(){
 // ═══════════════════════════════════════════════════
 // MOUSE / TOUCH EVENTS
 // ═══════════════════════════════════════════════════
+const MIN_HIT_PX=28; // 屏幕像素最小点击热区（移动端友好）
+
 function getNodeAt(cx,cy){
   const {x,y}=toWorld(cx,cy);
+  let best=null,bestDist=Infinity;
   for(const n of nodes){
-    const dx=x-n.x,dy=y-n.y;
-    if(dx*dx+dy*dy<(n.r+6)*(n.r+6))return n;
+    const sdx=(n.x-x)*zoom,sdy=(n.y-y)*zoom;
+    const screenDist=Math.sqrt(sdx*sdx+sdy*sdy);
+    const hitR=Math.max((n.r+8)*zoom,MIN_HIT_PX);
+    if(screenDist<hitR&&screenDist<bestDist){
+      best=n;
+      bestDist=screenDist;
+    }
   }
-  return null;
+  return best;
 }
 
 function getGroupAt(cx,cy){
@@ -1396,175 +1412,174 @@ canvas.addEventListener('wheel',e=>{
 // 双指：捏合缩放
 // ═══════════════════════════════════════════════════
 (function(){
-  let t0 = null;          // 第一个触点（对象 {id,x,y}）
-  let t1 = null;          // 第二个触点（双指用）
-  let lastPinchDist = 0;
-  let touchDragging = false;
-  let touchNode = null;   // 正在拖的节点
-  let touchStartX = 0, touchStartY = 0;
-  let touchStartPanX = 0, touchStartPanY = 0;
-  let touchStartTime = 0;
-  const TAP_DIST = 10;    // 手指移动多少像素以内算"点击"
-  const TAP_TIME = 250;   // ms
+  let t0=null,t1=null;
+  let lastPinchDist=0;
+  let touchNode=null;
+  let touchPending=null;
+  let touchStartX=0,touchStartY=0;
+  let touchStartPanX=0,touchStartPanY=0;
+  let touchStartTime=0;
+  const TAP_TIME=400;
+  const DRAG_START=8;
 
   function getTouchPos(touch){
-    const rect = canvas.getBoundingClientRect();
-    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    const rect=canvas.getBoundingClientRect();
+    return{x:touch.clientX-rect.left,y:touch.clientY-rect.top};
   }
 
-  function pinchDist(a, b){
-    const dx = a.clientX - b.clientX;
-    const dy = a.clientY - b.clientY;
-    return Math.sqrt(dx*dx + dy*dy);
+  function pinchDist(a,b){
+    const dx=a.clientX-b.clientX,dy=a.clientY-b.clientY;
+    return Math.sqrt(dx*dx+dy*dy);
   }
 
-  canvas.addEventListener('touchstart', e=>{
+  function detectTouchTarget(cx,cy){
+    const node=getNodeAt(cx,cy);
+    if(node) return{type:'node',node};
+    const group=getGroupAt(cx,cy);
+    if(group){
+      const {x,y}=toWorld(cx,cy);
+      return{type:'group',sys:group.sys,offsetX:x-group.frame.minX,offsetY:y-group.frame.minY};
+    }
+    return{type:'pan'};
+  }
+
+  function activateTouchDrag(pending,sx,sy){
+    if(pending.type==='node'){
+      touchNode=pending.node;
+      pending.node.pinned=true;
+      drag={type:'node',node:pending.node};
+    }else if(pending.type==='group'){
+      touchNode=null;
+      drag={type:'group',sys:pending.sys,offsetX:pending.offsetX,offsetY:pending.offsetY};
+      (CATEGORY_GROUPS[pending.sys]||[]).forEach(id=>{
+        const nd=nmap[id];if(nd)nd.pinned=true;
+      });
+    }else{
+      touchNode=null;
+      drag={type:'pan',startX:sx,startY:sy,startPanX:pan.x,startPanY:pan.y};
+    }
+  }
+
+  function releaseTouchDrag(){
+    if(touchNode){touchNode.pinned=false;touchNode=null;}
+    if(drag&&drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
+    }
+    drag=null;
+  }
+
+  canvas.addEventListener('touchstart',e=>{
     e.preventDefault();
-    const touches = e.touches;
+    const touches=e.touches;
 
-    if(touches.length === 1){
-      const p = getTouchPos(touches[0]);
-      t0 = { id: touches[0].identifier, ...p };
-      t1 = null;
-      touchStartX = p.x; touchStartY = p.y;
-      touchStartPanX = pan.x; touchStartPanY = pan.y;
-      touchStartTime = Date.now();
-      touchDragging = false;
+    if(touches.length===1){
+      const p=getTouchPos(touches[0]);
+      t0={id:touches[0].identifier,...p};
+      t1=null;
+      touchStartX=p.x;touchStartY=p.y;
+      touchStartPanX=pan.x;touchStartPanY=pan.y;
+      touchStartTime=Date.now();
+      touchPending=detectTouchTarget(p.x,p.y);
+      touchNode=null;
+      drag=null;
+      _didDrag=false;
 
-      // Priority: node > group > pan（与桌面端保持一致）
-      const node = getNodeAt(p.x, p.y);
+    }else if(touches.length===2){
+      touchPending=null;
+      releaseTouchDrag();
+      t0={id:touches[0].identifier,...getTouchPos(touches[0])};
+      t1={id:touches[1].identifier,...getTouchPos(touches[1])};
+      lastPinchDist=pinchDist(touches[0],touches[1]);
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const touches=e.touches;
+
+    if(touches.length===2){
+      touchPending=null;
+      const dist=pinchDist(touches[0],touches[1]);
+      if(lastPinchDist>0){
+        const scale=dist/lastPinchDist;
+        const mx=(touches[0].clientX+touches[1].clientX)/2-canvas.getBoundingClientRect().left;
+        const my=(touches[0].clientY+touches[1].clientY)/2-canvas.getBoundingClientRect().top;
+        const newZoom=Math.max(0.3,Math.min(4,zoom*scale));
+        pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+        pan.y=my-(my-pan.y)*(newZoom/zoom);
+        zoom=newZoom;
+      }
+      lastPinchDist=dist;
+      _didDrag=true;
+
+    }else if(touches.length===1&&t0!==null){
+      const p=getTouchPos(touches[0]);
+      const dx=p.x-touchStartX,dy=p.y-touchStartY;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(!drag&&touchPending&&dist>DRAG_START){
+        activateTouchDrag(touchPending,touchStartX,touchStartY);
+        touchPending=null;
+        _didDrag=true;
+      }
+
+      if(drag){
+        if(drag.type==='node'){
+          const w=toWorld(p.x,p.y);
+          drag.node.x=w.x;drag.node.y=w.y;
+          drag.node.vx=0;drag.node.vy=0;
+          if(locked)updateLockedPanelPos();
+        }else if(drag.type==='group'){
+          const w=toWorld(p.x,p.y);
+          const frames=computeGroupFrames();
+          const f=frames[drag.sys];
+          if(f){
+            const shiftX=w.x-drag.offsetX-f.minX;
+            const shiftY=w.y-drag.offsetY-f.minY;
+            (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+              const nd=nmap[id];
+              if(nd){nd.x+=shiftX;nd.y+=shiftY;nd.vx=0;nd.vy=0;}
+            });
+          }
+          if(locked)updateLockedPanelPos();
+        }else{
+          pan.x=touchStartPanX+dx;
+          pan.y=touchStartPanY+dy;
+        }
+      }
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    const remaining=e.touches.length;
+    const isTap=!_didDrag&&(Date.now()-touchStartTime<TAP_TIME);
+
+    if(remaining===0&&isTap&&e.changedTouches.length>0){
+      const p=getTouchPos(e.changedTouches[0]);
+      const node=getNodeAt(p.x,p.y);
       if(node){
-        touchNode = node;
-        node.pinned = true;
-        drag = { type:'node', node };
-      } else {
-        const group = getGroupAt(p.x, p.y);
-        if(group){
-          touchNode = null;
-          const {x,y} = toWorld(p.x, p.y);
-          drag = {
-            type:'group',
-            sys: group.sys,
-            offsetX: x - group.frame.minX,
-            offsetY: y - group.frame.minY
-          };
-          (CATEGORY_GROUPS[group.sys]||[]).forEach(id=>{
-            const nd=nmap[id]; if(nd) nd.pinned=true;
-          });
-        } else {
-          touchNode = null;
-          drag = { type:'pan', startX:p.x, startY:p.y, startPanX:pan.x, startPanY:pan.y };
-        }
-      }
-      _didDrag = false;
-
-    } else if(touches.length === 2){
-      // 双指开始：记录捏合距离，取消单指拖拽
-      if(touchNode){ touchNode.pinned = false; touchNode = null; }
-      if(drag && drag.type==='group'){
-        (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
-      }
-      drag = null;
-      t0 = { id: touches[0].identifier, ...getTouchPos(touches[0]) };
-      t1 = { id: touches[1].identifier, ...getTouchPos(touches[1]) };
-      lastPinchDist = pinchDist(touches[0], touches[1]);
-    }
-  }, {passive:false});
-
-  canvas.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    const touches = e.touches;
-
-    if(touches.length === 2){
-      // 双指捏合缩放 + 平移
-      const dist = pinchDist(touches[0], touches[1]);
-      if(lastPinchDist > 0){
-        const scale = dist / lastPinchDist;
-        const mx = (touches[0].clientX + touches[1].clientX) / 2 - canvas.getBoundingClientRect().left;
-        const my = (touches[0].clientY + touches[1].clientY) / 2 - canvas.getBoundingClientRect().top;
-        const newZoom = Math.max(0.3, Math.min(4, zoom * scale));
-        pan.x = mx - (mx - pan.x) * (newZoom / zoom);
-        pan.y = my - (my - pan.y) * (newZoom / zoom);
-        zoom = newZoom;
-      }
-      lastPinchDist = dist;
-      _didDrag = true;
-
-    } else if(touches.length === 1 && t0 !== null){
-      const p = getTouchPos(touches[0]);
-      const dx = p.x - touchStartX;
-      const dy = p.y - touchStartY;
-      if(Math.sqrt(dx*dx+dy*dy) > TAP_DIST) { touchDragging = true; _didDrag = true; }
-
-      if(touchNode){
-        // 拖节点
-        const w = toWorld(p.x, p.y);
-        touchNode.x = w.x; touchNode.y = w.y;
-        touchNode.vx = 0; touchNode.vy = 0;
-        if(locked) updateLockedPanelPos();
-      } else if(drag && drag.type==='group'){
-        // 拖分组框（与桌面端一致）
-        const w = toWorld(p.x, p.y);
-        const targetX = w.x - drag.offsetX;
-        const targetY = w.y - drag.offsetY;
-        // 计算当前 frame，移动所有节点
-        const frames = computeGroupFrames();
-        const f = frames[drag.sys];
-        if(f){
-          const shiftX = targetX - f.minX;
-          const shiftY = targetY - f.minY;
-          (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
-            const nd=nmap[id];
-            if(nd){ nd.x+=shiftX; nd.y+=shiftY; nd.vx=0; nd.vy=0; }
-          });
-        }
-        if(locked) updateLockedPanelPos();
-      } else {
-        // 平移
-        pan.x = touchStartPanX + dx;
-        pan.y = touchStartPanY + dy;
-      }
-    }
-  }, {passive:false});
-
-  canvas.addEventListener('touchend', e=>{
-    e.preventDefault();
-    const remaining = e.touches.length;
-
-    if(touchNode){ touchNode.pinned = false; touchNode = null; }
-    if(drag && drag.type==='group'){
-      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
-    }
-    drag = null;
-    lastPinchDist = 0;
-
-    const isTap = !_didDrag && !touchDragging && (Date.now() - touchStartTime < TAP_TIME);
-    if(remaining === 0 && isTap){
-      // 轻触 = 点击
-      if(e.changedTouches.length > 0){
-        const p = getTouchPos(e.changedTouches[0]);
-        const node = getNodeAt(p.x, p.y);
-        if(node){
-          if(locked === node.id){ locked = null; showPanel(null); }
-          else { locked = node.id; showPanel(node.id, p.x, p.y); }
-        } else {
-          locked = null; showPanel(null);
-        }
+        if(locked===node.id){locked=null;showPanel(null);}
+        else{locked=node.id;showPanel(node.id,p.x,p.y);}
+      }else{
+        locked=null;showPanel(null);
       }
     }
 
-    t0 = null; t1 = null;
-    touchDragging = false;
-  }, {passive:false});
+    releaseTouchDrag();
+    touchPending=null;
+    lastPinchDist=0;
+    t0=null;t1=null;
+    _didDrag=false;
+  },{passive:false});
 
-  canvas.addEventListener('touchcancel', e=>{
-    if(touchNode){ touchNode.pinned = false; touchNode = null; }
-    if(drag && drag.type==='group'){
-      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
-    }
-    drag = null; t0 = null; t1 = null;
-    lastPinchDist = 0; touchDragging = false;
-  }, {passive:false});
+  canvas.addEventListener('touchcancel',e=>{
+    releaseTouchDrag();
+    touchPending=null;
+    t0=null;t1=null;
+    lastPinchDist=0;
+    _didDrag=false;
+  },{passive:false});
 })();
 
 // ── Legend click toggle (works on mobile too) ──
