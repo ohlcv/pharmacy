@@ -65,29 +65,6 @@ body{
   color:var(--text-muted);
 }
 
-/* ── Music button ── */
-#music-btn{
-  flex-shrink:0;
-  width:32px;height:32px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:var(--bg);
-  color:var(--text-secondary);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;
-  transition:all .15s;
-}
-#music-btn:hover{border-color:var(--accent);color:var(--accent);background:#fff;}
-#music-btn.playing{border-color:var(--accent);color:var(--accent);background:#e6f4f1;}
-#music-btn svg{width:15px;height:15px;}
-
-#controls{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
 /* ── Search bar ── */
 #search-wrap{flex:1;max-width:260px;position:relative;}
 #search-input{
@@ -106,10 +83,14 @@ body{
 }
 #search-clear.visible{display:flex;}
 #search-badge{
-  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  position:absolute;
+  bottom:14px;
+  left:50%;
+  transform:translateX(-50%);
   background:rgba(15,110,86,.88);color:#fff;font-size:11px;padding:4px 12px;
   border-radius:20px;pointer-events:none;white-space:nowrap;
   backdrop-filter:blur(4px);opacity:0;transition:opacity .2s;
+  z-index:10;
 }
 #search-badge.visible{opacity:1;}
 
@@ -195,54 +176,7 @@ canvas{
   text-align:center;
 }
 
-/* ── Legend (horizontal in canvas) ── */
-#legend-wrap{
-  position:absolute;
-  top:10px;
-  right:10px;
-  z-index:5;
-}
-#legend{
-  background:rgba(255,255,255,0.9);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:10px 12px;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  backdrop-filter:blur(4px);
-  white-space:nowrap;
-  opacity:0;
-  visibility:hidden;
-  transform:translateX(8px);
-  transition:all 0.2s ease;
-}
-#legend.open{
-  opacity:1;
-  visibility:visible;
-  transform:translateX(0);
-}
-#legend-toggle{
-  width:24px;
-  height:24px;
-  border-radius:8px;
-  background:rgba(255,255,255,0.8);
-  border:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  transition:all 0.15s;
-}
-#legend-toggle:hover{
-  background:rgba(255,255,255,1);
-  border-color:var(--accent);
-}
-#legend-toggle svg{
-  width:12px;
-  height:12px;
-  color:var(--text-muted);
-}
+
 .leg{
   display:flex;
   align-items:center;
@@ -255,6 +189,87 @@ canvas{
   border-radius:50%;
   border:1.5px solid;
   flex-shrink:0;
+}
+
+/* ── Canvas toolbar (top-left: music + search) ── */
+#canvas-toolbar{
+  position:absolute;
+  top:10px;
+  left:10px;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.tool-btn{
+  width:32px;height:32px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;
+  transition:all 0.15s;
+  color:var(--text-muted);
+}
+.tool-btn svg{width:14px;height:14px;}
+.tool-btn:hover{background:#fff;border-color:var(--accent);color:var(--accent);}
+.tool-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ── Legend: toggle pinned top-right, panel expands downward ── */
+#legend-wrap{
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:5;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+#legend-toggle{
+  order:1;
+  width:32px;
+  height:32px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all 0.15s;
+  flex-shrink:0;
+}
+#legend-toggle:hover{
+  background:rgba(255,255,255,1);
+  border-color:var(--accent);
+}
+#legend-toggle svg{
+  width:14px;
+  height:14px;
+  color:var(--text-muted);
+}
+#legend{
+  order:2;
+  background:rgba(255,255,255,0.95);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  backdrop-filter:blur(6px);
+  white-space:nowrap;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(-6px);
+  transition:opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  box-shadow:0 4px 16px rgba(0,0,0,0.10);
+}
+#legend.open{
+  opacity:1;
+  visibility:visible;
+  transform:translateY(0);
 }
 
 /* ── Hint overlay ── */
@@ -282,26 +297,32 @@ canvas{
       <div id="header-title">药学知识拓扑图</div>
       <div id="header-sub">四力引擎 · 同类聚束 · 层势阱 · 临床层二维展开</div>
     </div>
-    <button id="music-btn" title="播放/暂停背景音乐">
-      <svg id="music-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
-      </svg>
-      <svg id="music-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
-        <circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/>
-      </svg>
-    </button>
-    <div id="search-wrap">
-      <svg id="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input id="search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false">
-      <button id="search-clear" title="清除">×</button>
-    </div>
-    <audio id="bgm" loop src="assets/Echoes of the Eye Soundtrack - Travelers’ Encore.mp3"></audio>
   </div>
 
   <div id="canvas-wrap">
     <canvas id="c"></canvas>
+
+    <!-- 左上角工具栏：音乐 + 搜索 -->
+    <div id="canvas-toolbar">
+      <button class="tool-btn active" id="music-btn" title="暂停背景音乐">
+        <svg id="music-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+          <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+        </svg>
+        <svg id="music-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <div id="search-wrap">
+        <svg id="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false">
+        <button id="search-clear" title="清除">×</button>
+      </div>
+    </div>
+
+    <!-- 节点信息浮窗 -->
     <div id="info-panel">
       <div id="info-panel-name"></div>
       <div id="info-panel-code"></div>
@@ -309,9 +330,14 @@ canvas{
       <div id="info-panel-links"></div>
       <div id="info-panel-hint">点击节点可锁定 · 再次点击解锁</div>
     </div>
+
+    <!-- 图例：toggle在右上，panel向下展开 -->
     <div id="legend-wrap">
       <div id="legend-toggle">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="4" x2="12" y2="20"/>
+        </svg>
       </div>
       <div id="legend">
         <div class="leg" style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;margin-bottom:2px">— 层 —</div>
@@ -329,10 +355,14 @@ canvas{
         <div class="leg"><span class="leg-dot" style="background:#4B5563;border-color:#4B5563"></span>肿瘤·专科</div>
       </div>
     </div>
+
     <div id="hint-bar">空白处拖动平移 · 节点/分组可拖拽 · 滚轮缩放 · 点击节点查看详情</div>
     <div id="search-badge"></div>
   </div>
 </div>
+
+<!-- BGM playlist -->
+<audio id="bgm" preload="none"></audio>
 
 <script>
 // ═══════════════════════════════════════════════════
@@ -696,7 +726,7 @@ function resize(){
   canvas.height=H*DPR;
   canvas.style.width=W+'px';
   canvas.style.height=H+'px';
-  ctx.scale(DPR,DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
   fitView();
   initPositions();
   runForce(400);
@@ -944,9 +974,16 @@ function showPanel(nodeId, mouseX, mouseY){
       const nb=nmap[id];
       return nb&&LAYER_ORDER.indexOf(nb.layer)>nLayerIdx;
     });
+    const samelevel=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)===nLayerIdx;
+    });
     let html='';
     if(upstream.length){
       html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
+    }
+    if(samelevel.length){
+      html+=`<div class="link-row"><span>关联</span>${samelevel.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
     }
     if(downstream.length){
       html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
@@ -1318,8 +1355,178 @@ canvas.addEventListener('wheel',e=>{
 },{passive:false});
 
 // ═══════════════════════════════════════════════════
-// CONTROLS
+// TOUCH EVENTS
+// 单指：拖节点 / 平移画布 / 轻触点击
+// 双指：捏合缩放
 // ═══════════════════════════════════════════════════
+(function(){
+  let t0 = null;          // 第一个触点（对象 {id,x,y}）
+  let t1 = null;          // 第二个触点（双指用）
+  let lastPinchDist = 0;
+  let touchDragging = false;
+  let touchNode = null;   // 正在拖的节点
+  let touchStartX = 0, touchStartY = 0;
+  let touchStartPanX = 0, touchStartPanY = 0;
+  const TAP_DIST = 10;    // 手指移动多少像素以内算"点击"
+  const TAP_TIME = 250;   // ms
+
+  function getTouchPos(touch){
+    const rect = canvas.getBoundingClientRect();
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  }
+
+  function pinchDist(a, b){
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  canvas.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    const touches = e.touches;
+
+    if(touches.length === 1){
+      const p = getTouchPos(touches[0]);
+      t0 = { id: touches[0].identifier, ...p };
+      t1 = null;
+      touchStartX = p.x; touchStartY = p.y;
+      touchStartPanX = pan.x; touchStartPanY = pan.y;
+      touchDragging = false;
+
+      // Priority: node > group > pan（与桌面端保持一致）
+      const node = getNodeAt(p.x, p.y);
+      if(node){
+        touchNode = node;
+        node.pinned = true;
+        drag = { type:'node', node };
+      } else {
+        const group = getGroupAt(p.x, p.y);
+        if(group){
+          touchNode = null;
+          const {x,y} = toWorld(p.x, p.y);
+          drag = {
+            type:'group',
+            sys: group.sys,
+            offsetX: x - group.frame.minX,
+            offsetY: y - group.frame.minY
+          };
+          (CATEGORY_GROUPS[group.sys]||[]).forEach(id=>{
+            const nd=nmap[id]; if(nd) nd.pinned=true;
+          });
+        } else {
+          touchNode = null;
+          drag = { type:'pan', startX:p.x, startY:p.y, startPanX:pan.x, startPanY:pan.y };
+        }
+      }
+      _didDrag = false;
+
+    } else if(touches.length === 2){
+      // 双指开始：记录捏合距离，取消单指拖拽
+      if(touchNode){ touchNode.pinned = false; touchNode = null; }
+      if(drag && drag.type==='group'){
+        (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
+      }
+      drag = null;
+      t0 = { id: touches[0].identifier, ...getTouchPos(touches[0]) };
+      t1 = { id: touches[1].identifier, ...getTouchPos(touches[1]) };
+      lastPinchDist = pinchDist(touches[0], touches[1]);
+    }
+  }, {passive:false});
+
+  canvas.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    const touches = e.touches;
+
+    if(touches.length === 2){
+      // 双指捏合缩放 + 平移
+      const dist = pinchDist(touches[0], touches[1]);
+      if(lastPinchDist > 0){
+        const scale = dist / lastPinchDist;
+        const mx = (touches[0].clientX + touches[1].clientX) / 2 - canvas.getBoundingClientRect().left;
+        const my = (touches[0].clientY + touches[1].clientY) / 2 - canvas.getBoundingClientRect().top;
+        const newZoom = Math.max(0.3, Math.min(4, zoom * scale));
+        pan.x = mx - (mx - pan.x) * (newZoom / zoom);
+        pan.y = my - (my - pan.y) * (newZoom / zoom);
+        zoom = newZoom;
+      }
+      lastPinchDist = dist;
+      _didDrag = true;
+
+    } else if(touches.length === 1 && t0 !== null){
+      const p = getTouchPos(touches[0]);
+      const dx = p.x - touchStartX;
+      const dy = p.y - touchStartY;
+      if(Math.sqrt(dx*dx+dy*dy) > TAP_DIST) { touchDragging = true; _didDrag = true; }
+
+      if(touchNode){
+        // 拖节点
+        const w = toWorld(p.x, p.y);
+        touchNode.x = w.x; touchNode.y = w.y;
+        touchNode.vx = 0; touchNode.vy = 0;
+        if(locked) updateLockedPanelPos();
+      } else if(drag && drag.type==='group'){
+        // 拖分组框（与桌面端一致）
+        const w = toWorld(p.x, p.y);
+        const targetX = w.x - drag.offsetX;
+        const targetY = w.y - drag.offsetY;
+        // 计算当前 frame，移动所有节点
+        const frames = computeGroupFrames();
+        const f = frames[drag.sys];
+        if(f){
+          const shiftX = targetX - f.minX;
+          const shiftY = targetY - f.minY;
+          (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+            const nd=nmap[id];
+            if(nd){ nd.x+=shiftX; nd.y+=shiftY; nd.vx=0; nd.vy=0; }
+          });
+        }
+        if(locked) updateLockedPanelPos();
+      } else {
+        // 平移
+        pan.x = touchStartPanX + dx;
+        pan.y = touchStartPanY + dy;
+      }
+    }
+  }, {passive:false});
+
+  canvas.addEventListener('touchend', e=>{
+    e.preventDefault();
+    const remaining = e.touches.length;
+
+    if(touchNode){ touchNode.pinned = false; touchNode = null; }
+    if(drag && drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
+    }
+    drag = null;
+    lastPinchDist = 0;
+
+    if(remaining === 0 && !_didDrag && !touchDragging){
+      // 轻触 = 点击
+      if(e.changedTouches.length > 0){
+        const p = getTouchPos(e.changedTouches[0]);
+        const node = getNodeAt(p.x, p.y);
+        if(node){
+          if(locked === node.id){ locked = null; showPanel(null); }
+          else { locked = node.id; showPanel(node.id, p.x, p.y); }
+        } else {
+          locked = null; showPanel(null);
+        }
+      }
+    }
+
+    t0 = null; t1 = null;
+    touchDragging = false;
+  }, {passive:false});
+
+  canvas.addEventListener('touchcancel', e=>{
+    if(touchNode){ touchNode.pinned = false; touchNode = null; }
+    if(drag && drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
+    }
+    drag = null; t0 = null; t1 = null;
+    lastPinchDist = 0; touchDragging = false;
+  }, {passive:false});
+})();
 
 // ── Legend click toggle (works on mobile too) ──
 (function(){
@@ -1352,25 +1559,123 @@ canvas.addEventListener('wheel',e=>{
   searchClear.addEventListener('click',()=>{searchInput.value='';applySearch('');searchInput.focus();});
 })();
 
-// ── BGM ──
+
+// ── BGM 播放列表 ──
+// 【维护说明】把 assets/ 文件夹里的音频文件名填入下方数组，支持 mp3/ogg/wav/flac/aac/m4a。
+// file:// 协议下浏览器禁止目录扫描，所以这里手动列出。
+// 程序会随机打乱后循环播放，播完一轮再重新洗牌。
 (function(){
-  const btn=document.getElementById('music-btn');
-  const audio=document.getElementById('bgm');
-  const iconPlay=document.getElementById('music-icon-play');
-  const iconPause=document.getElementById('music-icon-pause');
-  audio.volume=0.45;
-  let playing=false;
-  function setPlaying(v){
-    playing=v;
-    btn.classList.toggle('playing',v);
-    iconPlay.style.display=v?'none':'block';
-    iconPause.style.display=v?'block':'none';
+  const btn      = document.getElementById('music-btn');
+  const audio    = document.getElementById('bgm');
+  const iconPlay = document.getElementById('music-icon-play');
+  const iconPause= document.getElementById('music-icon-pause');
+
+  // ↓↓↓ 在这里填写 assets/ 文件夹内所有音频文件名 ↓↓↓
+  const TRACKS = [
+    "Echoes of the Eye - Travelers Encore.mp3",
+    // "another-song.mp3",
+    // "bgm2.ogg",
+  ];
+  // ↑↑↑ 文件名列表结束 ↑↑↑
+
+  let queue = [], trackIdx = 0, playing = false;
+
+  function shuffle(arr){
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
   }
-  btn.addEventListener('click',()=>{
-    if(playing){ audio.pause(); setPlaying(false); }
-    else { audio.play().then(()=>setPlaying(true)).catch(()=>{}); }
+
+  function buildQueue(){ queue = shuffle(TRACKS); trackIdx = 0; }
+
+  function loadTrack(idx){
+    if(!queue.length) return;
+    // 始终用相对路径 assets/<filename>，避免路径重复拼接
+    const src = 'assets/' + queue[idx];
+    if(audio.src.endsWith(encodeURIComponent(queue[idx])) ||
+       audio.src.endsWith(queue[idx])) return; // 已经是这首，不重复 load
+    audio.src = src;
+    audio.load();
+  }
+
+  function playNext(){
+    if(!queue.length) return;
+    trackIdx = (trackIdx + 1) % queue.length;
+    if(trackIdx === 0) buildQueue();
+    // 直接设置，不走 loadTrack 的去重判断
+    audio.src = 'assets/' + queue[trackIdx];
+    audio.load();
+    audio.play().catch(()=>{});
+  }
+
+  audio.volume = 0.45;
+  audio.addEventListener('ended', playNext);
+
+  function setPlaying(v){
+    playing = v;
+    btn.classList.toggle('active', v);
+    iconPlay.style.display  = v ? 'none'  : 'block';
+    iconPause.style.display = v ? 'block' : 'none';
+    btn.title = v ? '暂停背景音乐' : '播放背景音乐';
+  }
+
+  // 初始化队列并预加载第一首
+  buildQueue();
+  audio.src = 'assets/' + queue[0];
+  audio.load();
+
+  // 点击音乐按钮：切换播放/暂停
+  btn.addEventListener('click', ()=>{
+    if(playing){
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play().then(()=>setPlaying(true)).catch(()=>{});
+    }
   });
-  audio.addEventListener('ended',()=>setPlaying(false));
+
+  // ── 自动播放逻辑 ──
+  // 初始按钮已是 ⏸ 实心绿（HTML 里写死），期待自动播放成功。
+  // canplay 后立即尝试 play()：
+  //   成功 → 保持 ⏸，正常播
+  //   失败 → 退回 ▶ 空心，注册一次性全局交互监听，交互后自动播
+  let autoStarted = false;
+
+  function tryAutoPlay(){
+    if(autoStarted) return;
+    autoStarted = true;
+    audio.play().then(()=>{
+      setPlaying(true);  // 成功：确保状态同步（图标已是 ⏸，再 setPlaying 保证 playing=true）
+    }).catch(()=>{
+      // 失败：退回 ▶ 空心
+      autoStarted = false;
+      setPlaying(false);
+
+      // 等任意用户交互（点击/键盘/触摸）后自动播
+      function onInteract(e){
+        if(e && btn.contains(e.target)) return; // 按钮自己的 click 由按钮 handler 处理
+        if(autoStarted) return;
+        autoStarted = true;
+        audio.play().then(()=>setPlaying(true)).catch(()=>{});
+        document.removeEventListener('click',      onInteract);
+        document.removeEventListener('keydown',    onInteract);
+        document.removeEventListener('touchstart', onInteract);
+      }
+      document.addEventListener('click',      onInteract, {once:true});
+      document.addEventListener('keydown',    onInteract, {once:true});
+      document.addEventListener('touchstart', onInteract, {once:true});
+    });
+  }
+
+  // audio 已可播放则立即触发，否则等 canplay 事件
+  if(audio.readyState >= 2){
+    tryAutoPlay();
+  } else {
+    audio.addEventListener('canplay', tryAutoPlay, {once:true});
+  }
 })();
 
 // Hide hint bar after 4s
@@ -1395,7 +1700,7 @@ window.addEventListener('resize',()=>{
   W=nW; H=nH;
   canvas.width=W*DPR; canvas.height=H*DPR;
   canvas.style.width=W+'px'; canvas.style.height=H+'px';
-  ctx.scale(DPR,DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
   fitView();
 });
 </script>
