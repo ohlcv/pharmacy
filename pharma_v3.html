@@ -153,13 +153,12 @@ canvas{
   padding:12px 14px;
   box-shadow:0 4px 20px rgba(0,0,0,0.12);
   pointer-events:none;
-  transition:opacity 0.15s;
   opacity:0;
   z-index:100;
+  transition:left 0.22s cubic-bezier(0.22,1,0.36,1), top 0.22s cubic-bezier(0.22,1,0.36,1), opacity 0.2s ease;
 }
 #info-panel.visible{
   opacity:1;
-  transform:translateY(0);
 }
 #info-panel-name{
   font-size:14px;
@@ -348,8 +347,18 @@ canvas{
   <div id="canvas-wrap">
     <canvas id="c"></canvas>
 
-    <!-- 左上角工具栏：音乐 + 搜索 -->
+    <!-- 左上角工具栏：漫游 + 音乐 + 搜索 -->
     <div id="canvas-toolbar">
+      <button class="tool-btn" id="roam-btn" title="自动漫游">
+        <svg id="roam-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
+          <path d="M12 8v4l3 3"/>
+        </svg>
+        <svg id="roam-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
       <button class="tool-btn" id="music-btn" title="播放背景音乐">
         <svg id="music-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
           <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
@@ -636,6 +645,15 @@ const nodes=rawNodes.map(n=>({
   x:0,y:0,vx:0,vy:0,
   pinned:false,
   degree:0,
+  // Visual smooth-transition state
+  _scale:1,
+  _targetScale:1,
+  _glow:0,
+  _targetGlow:0,
+  _alpha:1,
+  _targetAlpha:1,
+  _pulse:0,    // 0~1 pulse ring progress
+  _pulseDir:1, // 1=growing, -1=shrinking
 }));
 
 const nmap={};
@@ -646,6 +664,9 @@ const adj={};
 nodes.forEach(n=>adj[n.id]=new Set());
 rawEdges.forEach(([a,b])=>{adj[a].add(b);adj[b].add(a);});
 nodes.forEach(n=>n.degree=adj[n.id].size);
+
+// Edge animation state: each edge gets a progress (0=hidden, 1=fully drawn)
+const edgeState=rawEdges.map(()=>({progress:0,_alpha:0}));
 
 // Scale radius by degree (增强团块感)
 nodes.forEach(n=>{
@@ -968,9 +989,16 @@ function getHighlighted(id){
 // ═══════════════════════════════════════════════════
 // INFO PANEL
 // ═══════════════════════════════════════════════════
+// Panel smooth-position state
+const panelState={
+  currentX:0,currentY:0,
+  targetX:0,targetY:0,
+  _rafId:null,
+};
+
 function showPanel(nodeId, mouseX, mouseY){
   const panel=document.getElementById('info-panel');
-  if(!nodeId){panel.classList.remove('visible');return;}
+  if(!nodeId){panel.classList.remove('visible');panelState.targetX=-9999;panelState.targetY=-9999;return;}
 
   const info=NODE_INFO[nodeId]||{};
   const n=nmap[nodeId];
@@ -1020,13 +1048,21 @@ function showPanel(nodeId, mouseX, mouseY){
   const panelW = 220;
   panel.style.visibility='hidden';
   panel.classList.add('visible');
-  const panelH=panel.offsetHeight||160;
-  let px=mouseX+15;
-  let py=mouseY+15;
-  if(px+panelW>W-10) px=mouseX-panelW-15;
-  if(py+panelH>H-10) py=mouseY-panelH-15;
-  px=Math.max(6,px);
-  py=Math.max(6,py);
+  // Force reflow so offsetHeight is accurate after content update
+  void panel.offsetHeight;
+  const panelH=panel.offsetHeight||180;
+  let px=mouseX+18;
+  let py=mouseY+18;
+  if(px+panelW>W-10) px=mouseX-panelW-18;
+  if(py+panelH>H-10) py=mouseY-panelH-18;
+  px=Math.max(8,px);
+  py=Math.max(8,py);
+
+  // First time: snap instantly; subsequent: smooth transition via CSS
+  const isFirstShow=!(panelState.targetX>-9000);
+  if(isFirstShow){
+    panel.style.transition='opacity 0.2s';
+  }
   panel.style.left=px+'px';
   panel.style.top=py+'px';
   panel.style.visibility='';
@@ -1035,7 +1071,16 @@ function showPanel(nodeId, mouseX, mouseY){
 function updateLockedPanelPos(){
   if(!locked) return;
   const n=nmap[locked]; if(!n) return;
-  showPanel(locked, n.x*zoom+pan.x, n.y*zoom+pan.y);
+  const panel=document.getElementById('info-panel');
+  const panelW=220;
+  const panelH=panel.offsetHeight||180;
+  let px=n.x*zoom+pan.x+18;
+  let py=n.y*zoom+pan.y+18;
+  if(px+panelW>W-10) px=n.x*zoom+pan.x-panelW-18;
+  if(py+panelH>H-10) py=n.y*zoom+pan.y-panelH-18;
+  px=Math.max(8,px);py=Math.max(8,py);
+  panel.style.left=px+'px';
+  panel.style.top=py+'px';
 }
 
 // ═══════════════════════════════════════════════════
@@ -1093,19 +1138,35 @@ function drawGroupBg(frames){
   });
 }
 
-function drawEdge(a,b,type,highlighted){
+function drawEdge(a,b,type,highlighted,progress,eState){
   ctx.save();
   const isLit=highlighted?highlighted.has(a.id)&&highlighted.has(b.id):true;
 
-  ctx.globalAlpha=isLit?1:0.04;
+  // Smooth alpha transition
+  let targetAlpha=isLit?1:0.04;
+  eState._alpha=lerp(eState._alpha,targetAlpha,0.10);
+  ctx.globalAlpha=eState._alpha;
 
-  ctx.beginPath();
-  ctx.moveTo(a.x,a.y);
+  // Compute bezier length for dash sizing
   const mx=(a.x+b.x)/2;
   const my=(a.y+b.y)/2;
   const dy=Math.abs(b.y-a.y);
   const curve=dy>100?40:16;
-  ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+  // Approximate quadratic bezier arc length
+  const ax=a.x,ay=a.y,cx=mx,cy=my-curve,bx_=b.x,by=b.y;
+  const bezierLen=approxBezierLen(ax,ay,cx,cy,bx_,by);
+  const dashLen=bezierLen;
+
+  // Draw path from 0 → progress fraction
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y);
+  if(progress>=1){
+    ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+  } else {
+    // Sample point along bezier at progress
+    const pt=getBezierPoint(ax,ay,cx,cy,bx_,by,progress);
+    ctx.lineTo(pt.x,pt.y);
+  }
 
   if(type==='net'){
     ctx.setLineDash([5,4]);
@@ -1119,7 +1180,7 @@ function drawEdge(a,b,type,highlighted){
   ctx.stroke();
 
   // Highlight glow
-  if(isLit&&highlighted){
+  if(isLit&&highlighted&&progress>=1){
     ctx.beginPath();
     ctx.moveTo(a.x,a.y);
     ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
@@ -1131,6 +1192,31 @@ function drawEdge(a,b,type,highlighted){
   ctx.restore();
 }
 
+// Approximate quadratic bezier arc length (Simpson's rule, 20 samples)
+function approxBezierLen(ax,ay,cx,cy,bx,by){
+  const n=20;
+  let len=0;
+  let px=ax,py=ay;
+  for(let i=1;i<=n;i++){
+    const t=i/n;
+    const pt=getBezierPoint(ax,ay,cx,cy,bx,by,t);
+    const dx=pt.x-px,dy=pt.y-py;
+    len+=Math.sqrt(dx*dx+dy*dy);
+    px=pt.x;py=pt.y;
+  }
+  return len;
+}
+
+// Quadratic bezier point at parameter t
+function getBezierPoint(ax,ay,cx,cy,bx,by,t){
+  const mt=1-t;
+  const x=mt*mt*ax+2*mt*t*cx+t*t*bx;
+  const y=mt*mt*ay+2*mt*t*cy+t*t*by;
+  return {x,y};
+}
+
+function lerp(a,b,t){return a+(b-a)*t;}
+
 function drawNode(n,highlighted){
   const isHovered=hovered===n.id;
   const isLocked=locked===n.id;
@@ -1138,20 +1224,43 @@ function drawNode(n,highlighted){
   const inSearch=!searchQuery||n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery)||
     [...adj[n.id]].some(nb=>nb.replace(/\n/g,'').toLowerCase().includes(searchQuery));
 
-  ctx.save();
-  let alpha=1;
-  if(!isActive)alpha=0.07;
-  else if(searchQuery&&!inSearch)alpha=0.1;
-  ctx.globalAlpha=alpha;
+  // Compute target alpha
+  let targetAlpha=1;
+  if(!isActive)targetAlpha=0.07;
+  else if(searchQuery&&!inSearch)targetAlpha=0.1;
+  n._alpha=lerp(n._alpha,targetAlpha,0.12);
+  n._targetAlpha=targetAlpha;
 
-  const scale=isHovered||isLocked?1.12:1;
-  const nodeR=n.r*scale;
+  ctx.save();
+  ctx.globalAlpha=n._alpha;
+
+  // Smooth transition targets
+  const targetScale=isHovered||isLocked?1.12:1;
+  const targetGlow=isHovered||isLocked?1:0;
+  n._scale=lerp(n._scale,targetScale,0.18);
+  n._glow=lerp(n._glow,targetGlow,0.18);
+
+  const nodeR=n.r*n._scale;
   const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
 
-  if(isHovered||isLocked){
+  // Pulsing breath ring for idle nodes
+  if(n._glow<0.05&&!searchQuery){
+    n._pulse+=0.018*n._pulseDir;
+    if(n._pulse>=1){n._pulse=1;n._pulseDir=-1;}
+    if(n._pulse<=0){n._pulse=0;n._pulseDir=1;}
+    const pulseR=nodeR+4+n._pulse*12;
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,pulseR,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+(Math.round((1-n._pulse)*35)).toString(16).padStart(2,'0');
+    ctx.lineWidth=1;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
+  if(n._glow>0.05){
     ctx.shadowColor=colors.stroke+'55';
-    ctx.shadowBlur=18;
-    ctx.shadowOffsetY=3;
+    ctx.shadowBlur=18*n._glow;
+    ctx.shadowOffsetY=3*n._glow;
   }
 
   // Fill
@@ -1165,9 +1274,11 @@ function drawNode(n,highlighted){
 
   ctx.shadowColor='transparent';
 
-  // Stroke
+  // Stroke — smooth lineWidth transition
+  const targetLW=isHovered||isLocked?2.5:1.3;
+  const lw=lerp(ctx.lineWidth||1.3, targetLW, 0.18);
   ctx.strokeStyle=colors.stroke;
-  ctx.lineWidth=isHovered||isLocked?2.5:1.3;
+  ctx.lineWidth=lw;
   ctx.stroke();
 
   // Locked indicator ring
@@ -1187,15 +1298,17 @@ function drawNode(n,highlighted){
     ctx.strokeStyle=colors.stroke+'aa';ctx.lineWidth=2;ctx.setLineDash([3,2]);ctx.stroke();ctx.setLineDash([]);
   }
 
-  // Text
-  ctx.globalAlpha=alpha;
+  // Text — smooth font-weight transition
+  const targetWeight=isHovered||isLocked?700:500;
   ctx.fillStyle=colors.text;
   const fontSize=n.r>28?12:n.r>22?11:10;
-  ctx.font=(isHovered||isLocked?'700':'500')+' '+fontSize+'px Noto Sans SC,sans-serif';
+  // Approximate weight with size nudge
+  const weightSize=lerp(fontSize, fontSize+(targetWeight-400)/80, 0.18);
+  ctx.font=`${targetWeight} ${weightSize}px 'Noto Sans SC',sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
   const lines=n.id.split('\n');
-  const lh=fontSize+3;
+  const lh=weightSize+3;
   lines.forEach((line,i)=>{
     ctx.fillText(line,n.x,n.y-(lines.length-1)*lh/2+i*lh);
   });
@@ -1231,11 +1344,15 @@ function render(){
   const focusId=locked||hovered;
   const highlighted=focusId?getHighlighted(focusId):null;
 
-  // Edges
-  rawEdges.forEach(([a,b,type])=>{
+  // Edges — animate each edge's drawing progress
+  for(let ei=0;ei<rawEdges.length;ei++){
+    const [a,b,type]=rawEdges[ei];
     const na=nmap[a],nb=nmap[b];
-    if(na&&nb) drawEdge(na,nb,type,highlighted);
-  });
+    if(!na||!nb) continue;
+    // Advance progress toward 1 each frame
+    edgeState[ei].progress=Math.min(1, edgeState[ei].progress+0.018);
+    drawEdge(na,nb,type,highlighted,edgeState[ei].progress,edgeState[ei]);
+  }
 
   // Nodes
   nodes.forEach(n=>drawNode(n,highlighted));
@@ -1614,7 +1731,139 @@ canvas.addEventListener('wheel',e=>{
 })();
 
 
-// ── BGM 播放列表 ──
+// ═══════════════════════════════════════════════════
+// ROAM MODE — Auto-cruise along graph edges
+// ═══════════════════════════════════════════════════
+(function(){
+  const btn      = document.getElementById('roam-btn');
+  const iconOff  = document.getElementById('roam-icon-off');
+  const iconOn   = document.getElementById('roam-icon-on');
+
+  const ROAM_STEP_MS  = 2800;   // ms per node visit
+  const PAN_DURATION  = 800;    // ms for camera pan to target node
+  const HOLD_MS       = 600;    // extra dwell time on each node
+  const IDLE_PAUSE    = 4000;   // pause when no node is active
+
+  let roaming    = false;
+  let roamTimer  = null;
+  let currentRoamNode = null;
+  let roamQueue  = [];
+  let roamPaused = false;
+
+  // Build a BFS traversal order starting from a random node
+  function buildRoamPath(){
+    if(!nodes.length) return;
+    const start = nodes[Math.floor(Math.random()*nodes.length)];
+    const visited = new Set();
+    const queue = [start];
+    const order = [];
+    while(queue.length){
+      const cur = queue.shift();
+      if(visited.has(cur.id)) continue;
+      visited.add(cur.id);
+      order.push(cur.id);
+      const nbs = [...(adj[cur.id]||[])];
+      // Shuffle neighbors for variety
+      for(let i=nbs.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [nbs[i],nbs[j]]=[nbs[j],nbs[i]];
+      }
+      nbs.forEach(nb=>{ if(!visited.has(nb)) queue.push(nmap[nb]); });
+    }
+    return order;
+  }
+
+  function panToNode(nodeId){
+    if(!nodeId) return;
+    const n = nmap[nodeId];
+    if(!n) return;
+    const targetX = W/2 - n.x*zoom;
+    const targetY = H/2 - n.y*zoom;
+    const startX=pan.x, startY=pan.y;
+    const startT=performance.now();
+    function step(now){
+      const t=Math.min(1,(now-startT)/PAN_DURATION);
+      const ease=1-Math.pow(1-t,3); // cubic ease-out
+      pan.x=startX+(targetX-startX)*ease;
+      pan.y=startY+(targetY-startY)*ease;
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function roamStep(){
+    if(!roaming||roamPaused) return;
+
+    // Advance queue
+    if(!roamQueue.length) roamQueue=buildRoamPath();
+
+    const nextId = roamQueue.shift();
+    roamQueue.push(nextId); // cycle
+    currentRoamNode = nextId;
+
+    // Pan camera to node
+    panToNode(nextId);
+
+    // Lock highlight panel briefly, then unlock for next step
+    locked=nextId;
+    showPanel(nextId, W/2, H/2);
+
+    roamPaused=true;
+    roamTimer=setTimeout(()=>{
+      locked=null;
+      roamPaused=false;
+      roamTimer=setTimeout(roamStep, HOLD_MS);
+    }, ROAM_STEP_MS);
+  }
+
+  // Pause roaming while user interacts with canvas
+  canvas.addEventListener('mousedown',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roamPaused=false;
+      roaming=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    }
+  });
+  canvas.addEventListener('touchstart',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roamPaused=false;
+      roaming=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    }
+  },{passive:true});
+
+  function updateRoamUI(active){
+    btn.classList.toggle('active', active);
+    iconOff.style.display = active?'none':'block';
+    iconOn.style.display  = active?'block':'none';
+    btn.title = active?'暂停漫游':'自动漫游';
+  }
+
+  btn.addEventListener('click',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roaming=false;
+      roamPaused=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    } else {
+      roaming=true;
+      roamQueue=buildRoamPath();
+      roamPaused=false;
+      updateRoamUI(true);
+      roamStep();
+    }
+  });
+})();
+
+
 // 【维护说明】把 assets/ 文件夹里的音频文件名填入下方数组，支持 mp3/ogg/wav/flac/aac/m4a。
 // file:// 协议下浏览器禁止目录扫描，所以这里手动列出。
 // 程序会随机打乱后循环播放，播完一轮再重新洗牌。
@@ -1706,6 +1955,7 @@ canvas.addEventListener('wheel',e=>{
     '四力引擎','同类聚束','层引势阱','二维展开','电磁斥力',
     '二跳高亮','跨层连边','系统分组','贝塞尔线','多层拓扑',
     '节点锁定','分组拖拽','捏合缩放','实时搜索','上下游链',
+    '平滑过渡','脉冲呼吸','描边入场','漫游巡游',
   ];
   const el=document.getElementById('header-sub-text');
   const SHOW_MS=2800;
