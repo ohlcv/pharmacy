@@ -32,19 +32,27 @@ body{
 
 /* ── Header ── */
 #header{
+  position:relative;
   display:flex;
   align-items:center;
-  justify-content:center;
-  padding:12px 16px;
+  justify-content:flex-end;
+  padding:8px 16px;
   background:var(--surface);
   border-bottom:1px solid var(--border);
   flex-shrink:0;
+  gap:10px;
+  min-height:52px;
 }
-#header-left{
+#header-center{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
   display:flex;
   flex-direction:column;
+  align-items:center;
   gap:2px;
-  text-align:center;
+  pointer-events:none;
+  white-space:nowrap;
 }
 #header-title{
   font-size:16px;
@@ -57,6 +65,22 @@ body{
   color:var(--text-muted);
 }
 
+/* ── Music button ── */
+#music-btn{
+  flex-shrink:0;
+  width:32px;height:32px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text-secondary);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:all .15s;
+}
+#music-btn:hover{border-color:var(--accent);color:var(--accent);background:#fff;}
+#music-btn.playing{border-color:var(--accent);color:var(--accent);background:#e6f4f1;}
+#music-btn svg{width:15px;height:15px;}
+
 #controls{
   display:flex;
   align-items:center;
@@ -64,12 +88,38 @@ body{
   flex-wrap:wrap;
 }
 
+/* ── Search bar ── */
+#search-wrap{flex:1;max-width:260px;position:relative;}
+#search-input{
+  width:100%;height:32px;border:1px solid var(--border);border-radius:8px;
+  padding:0 28px 0 30px;font-size:12px;font-family:inherit;color:var(--text-primary);
+  background:var(--bg);outline:none;transition:border-color .15s,box-shadow .15s;
+}
+#search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,110,86,.1);background:#fff;}
+#search-input::placeholder{color:var(--text-muted);}
+#search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--text-muted);pointer-events:none;}
+#search-clear{
+  position:absolute;right:7px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;border-radius:50%;background:var(--text-muted);color:#fff;
+  font-size:10px;display:none;align-items:center;justify-content:center;
+  cursor:pointer;border:none;line-height:1;
+}
+#search-clear.visible{display:flex;}
+#search-badge{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  background:rgba(15,110,86,.88);color:#fff;font-size:11px;padding:4px 12px;
+  border-radius:20px;pointer-events:none;white-space:nowrap;
+  backdrop-filter:blur(4px);opacity:0;transition:opacity .2s;
+}
+#search-badge.visible{opacity:1;}
+
 /* ── Canvas area ── */
 #canvas-wrap{
   flex:1;
   position:relative;
   overflow:hidden;
   background:var(--surface);
+  touch-action:none;
 }
 canvas{
   display:block;
@@ -167,8 +217,7 @@ canvas{
   transform:translateX(8px);
   transition:all 0.2s ease;
 }
-#legend-wrap:hover #legend,
-#legend-wrap.show #legend{
+#legend.open{
   opacity:1;
   visibility:visible;
   transform:translateX(0);
@@ -229,10 +278,26 @@ canvas{
 <body>
 <div id="app">
   <div id="header">
-    <div id="header-left">
+    <div id="header-center">
       <div id="header-title">药学知识拓扑图</div>
-      <div id="header-sub">纯四力引擎 · 强力同类聚束 · 电磁力类间组织 · 引力层势阱 · 弱力边界恢复</div>
+      <div id="header-sub">四力引擎 · 同类聚束 · 层势阱 · 临床层二维展开</div>
     </div>
+    <button id="music-btn" title="播放/暂停背景音乐">
+      <svg id="music-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg id="music-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+        <circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/>
+      </svg>
+    </button>
+    <div id="search-wrap">
+      <svg id="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false">
+      <button id="search-clear" title="清除">×</button>
+    </div>
+    <audio id="bgm" loop src="assets/Echoes of the Eye Soundtrack - Travelers’ Encore.mp3"></audio>
   </div>
 
   <div id="canvas-wrap">
@@ -264,72 +329,53 @@ canvas{
         <div class="leg"><span class="leg-dot" style="background:#4B5563;border-color:#4B5563"></span>肿瘤·专科</div>
       </div>
     </div>
-    <div id="hint-bar">拖拽节点/组调整布局 · 点击节点查看详情 · 滚轮缩放 · 点击右上角图例</div>
+    <div id="hint-bar">空白处拖动平移 · 节点/分组可拖拽 · 滚轮缩放 · 点击节点查看详情</div>
+    <div id="search-badge"></div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════
-// PHYSICS CONSTANTS（物理参数统一管理，方便调参）
-// ═══════════════════════════════════════════════════
-// 强力参数
-let S_REPULSE_K = 45000;   // 近程排斥强度
-let S_TARGET_F  = 1.8;     // 平衡距离 = minDist × 此值
-let S_RANGE     = 580;     // 强力射程
-let S_DECAY     = 1.1;     // 射程内指数衰减系数
-let S_ALPHA     = 0.35;    // 中程吸引力系数
-let S_DAMP      = 0.95;    // 同类节点内部阻尼
-// 电磁力参数
-let EM_K        = 15000;   // 电磁力强度系数
-let EM_RANGE    = 350;     // 电磁力作用范围
-let EM_MAX_F    = 22;      // 电磁力上限
-// 层势阱参数
-let G_WELL_K    = 0.08;    // 层势阱引力系数
-let G_CORE_REP  = 50000;   // 层核之间排斥常量
-
-// ═══════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════
-// NODE INFO（ID与显示名分离）
-// ═══════════════════════════════════════════════════
 const NODE_INFO={
-  pharm_toxicology:{label:'药理毒理学',code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
-  life_pharmacy:{label:'生命药学',code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
-  med_chemistry:{label:'药物化学',code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
-  pharmacokinetics:{label:'药物动力学',code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
-  pharmaceutics:{label:'药剂学',code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
-  receptor:{label:'受体',code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
-  enzyme:{label:'酶',code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
-  ion_channel:{label:'离子通道',code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
-  transporter:{label:'转运体',code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
-  hormone:{label:'激素',code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
-  pathogen:{label:'病原体',code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
-  neuro_drug:{label:'精神与中枢神经用药',code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
-  neuro_disease:{label:'神经系统常见疾病',code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
-  resp_drug:{label:'呼吸系统用药',code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
-  resp_disease:{label:'呼吸系统常见疾病',code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
-  digest_drug:{label:'消化系统用药',code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
-  digest_disease:{label:'消化系统常见疾病',code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
-  cardio_drug:{label:'心血管系统用药',code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
-  blood_drug:{label:'血液系统用药',code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
-  cardio_disease:{label:'心血管系统常见疾病',code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
-  endo_drug:{label:'内分泌系统用药',code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
-  endo_disease:{label:'内分泌系统常见疾病',code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
-  uro_drug:{label:'泌尿系统用药',code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
-  fluid_nutrition:{label:'水电解质营养用药',code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
-  uro_disease:{label:'泌尿系统常见疾病',code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
-  anti_infective:{label:'抗感染药物',code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
-  antipyretic_analgesic:{label:'解热镇痛抗炎抗风湿',code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
-  skin_drug:{label:'皮肤用药及抗过敏',code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
-  immuno_disease:{label:'免疫系统常见疾病',code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
-  anticancer:{label:'抗肿瘤药物',code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
-  cancer:{label:'肿瘤',code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
-  ent_drug:{label:'眼科耳鼻喉口腔用药',code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
-  chronic_disease:{label:'慢病管理',code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
-  drug_safety:{label:'用药安全',code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
-  prescription:{label:'处方审核与调剂',code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
-  consultation:{label:'用药咨询与治疗管理',code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
-  common_health:{label:'常见病症健康管理',code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
+  '生命药学':{code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
+  '药理毒理学':{code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
+  '药物化学':{code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
+  '药物动力学':{code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
+  '药剂学':{code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
+  '受体':{code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
+  '酶':{code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
+  '离子通道':{code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
+  '转运体':{code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
+  '激素':{code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
+  '病原体':{code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
+  '精神与\n中枢神经用药':{code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
+  '神经系统\n常见疾病':{code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
+  '呼吸系统\n用药':{code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
+  '呼吸系统\n常见疾病':{code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
+  '消化系统\n用药':{code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
+  '消化系统\n常见疾病':{code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
+  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
+  '血液系统\n用药':{code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
+  '心血管系统\n常见疾病':{code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
+  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
+  '内分泌系统\n常见疾病':{code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
+  '泌尿系统\n用药':{code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
+  '水电解质\n营养用药':{code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
+  '泌尿系统\n常见疾病':{code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
+  '抗感染\n药物':{code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
+  '解热镇痛\n抗炎抗风湿':{code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
+  '皮肤用药\n及抗过敏':{code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
+  '免疫系统\n常见疾病':{code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
+  '抗肿瘤\n药物':{code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
+  '肿瘤':{code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
+  '眼科耳鼻喉\n口腔用药':{code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
+  '慢病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
+  '用药安全':{code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
+  '处方审核\n与调剂':{code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
+  '用药咨询\n与治疗管理':{code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
+  '常见病症\n健康管理':{code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
 };
 
 const CATEGORY_COLORS={
@@ -367,110 +413,110 @@ const CATEGORY_BG={
 const LAYER_Y={foundation:0.12, bridge:0.35, clinical:0.62, service:0.88};
 
 const rawNodes=[
-  {id:'pharm_toxicology',layer:'foundation',r:40,category:'foundation'},
-  {id:'life_pharmacy',layer:'foundation',r:28,category:'foundation'},
-  {id:'med_chemistry',layer:'foundation',r:26,category:'foundation'},
-  {id:'pharmacokinetics',layer:'foundation',r:30,category:'foundation'},
-  {id:'pharmaceutics',layer:'foundation',r:26,category:'foundation'},
-  {id:'receptor',layer:'bridge',r:25,category:'bridge'},
-  {id:'enzyme',layer:'bridge',r:23,category:'bridge'},
-  {id:'ion_channel',layer:'bridge',r:25,category:'bridge'},
-  {id:'transporter',layer:'bridge',r:22,category:'bridge'},
-  {id:'hormone',layer:'bridge',r:21,category:'bridge'},
-  {id:'pathogen',layer:'bridge',r:21,category:'bridge'},
-  {id:'neuro_drug',layer:'clinical',r:26,category:'neuro'},
-  {id:'neuro_disease',layer:'clinical',r:24,category:'neuro'},
-  {id:'resp_drug',layer:'clinical',r:22,category:'resp'},
-  {id:'resp_disease',layer:'clinical',r:22,category:'resp'},
-  {id:'digest_drug',layer:'clinical',r:22,category:'digest'},
-  {id:'digest_disease',layer:'clinical',r:22,category:'digest'},
-  {id:'cardio_drug',layer:'clinical',r:28,category:'cardio'},
-  {id:'blood_drug',layer:'clinical',r:24,category:'cardio'},
-  {id:'endo_drug',layer:'clinical',r:26,category:'endo'},
-  {id:'cardio_disease',layer:'clinical',r:24,category:'cardio'},
-  {id:'endo_disease',layer:'clinical',r:24,category:'endo'},
-  {id:'uro_drug',layer:'clinical',r:22,category:'uro'},
-  {id:'fluid_nutrition',layer:'clinical',r:22,category:'uro'},
-  {id:'uro_disease',layer:'clinical',r:22,category:'uro'},
-  {id:'anti_infective',layer:'clinical',r:25,category:'immuno'},
-  {id:'antipyretic_analgesic',layer:'clinical',r:25,category:'immuno'},
-  {id:'skin_drug',layer:'clinical',r:22,category:'immuno'},
-  {id:'immuno_disease',layer:'clinical',r:22,category:'immuno'},
-  {id:'anticancer',layer:'clinical',r:23,category:'onco'},
-  {id:'cancer',layer:'clinical',r:21,category:'onco'},
-  {id:'ent_drug',layer:'clinical',r:22,category:'special'},
-  {id:'chronic_disease',layer:'service',r:27,category:'service'},
-  {id:'drug_safety',layer:'service',r:25,category:'service'},
-  {id:'prescription',layer:'service',r:24,category:'service'},
-  {id:'consultation',layer:'service',r:24,category:'service'},
-  {id:'common_health',layer:'service',r:24,category:'service'},
+  {id:'药理毒理学',layer:'foundation',r:40,category:'foundation'},
+  {id:'生命药学',layer:'foundation',r:28,category:'foundation'},
+  {id:'药物化学',layer:'foundation',r:26,category:'foundation'},
+  {id:'药物动力学',layer:'foundation',r:30,category:'foundation'},
+  {id:'药剂学',layer:'foundation',r:26,category:'foundation'},
+  {id:'受体',layer:'bridge',r:25,category:'bridge'},
+  {id:'酶',layer:'bridge',r:23,category:'bridge'},
+  {id:'离子通道',layer:'bridge',r:25,category:'bridge'},
+  {id:'转运体',layer:'bridge',r:22,category:'bridge'},
+  {id:'激素',layer:'bridge',r:21,category:'bridge'},
+  {id:'病原体',layer:'bridge',r:21,category:'bridge'},
+  {id:'精神与\n中枢神经用药',layer:'clinical',r:26,category:'neuro'},
+  {id:'神经系统\n常见疾病',layer:'clinical',r:24,category:'neuro'},
+  {id:'呼吸系统\n用药',layer:'clinical',r:22,category:'resp'},
+  {id:'呼吸系统\n常见疾病',layer:'clinical',r:22,category:'resp'},
+  {id:'消化系统\n用药',layer:'clinical',r:22,category:'digest'},
+  {id:'消化系统\n常见疾病',layer:'clinical',r:22,category:'digest'},
+  {id:'心血管系统\n用药',layer:'clinical',r:28,category:'cardio'},
+  {id:'血液系统\n用药',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n用药',layer:'clinical',r:26,category:'endo'},
+  {id:'心血管系统\n常见疾病',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n常见疾病',layer:'clinical',r:24,category:'endo'},
+  {id:'泌尿系统\n用药',layer:'clinical',r:22,category:'uro'},
+  {id:'水电解质\n营养用药',layer:'clinical',r:22,category:'uro'},
+  {id:'泌尿系统\n常见疾病',layer:'clinical',r:22,category:'uro'},
+  {id:'抗感染\n药物',layer:'clinical',r:25,category:'immuno'},
+  {id:'解热镇痛\n抗炎抗风湿',layer:'clinical',r:25,category:'immuno'},
+  {id:'皮肤用药\n及抗过敏',layer:'clinical',r:22,category:'immuno'},
+  {id:'免疫系统\n常见疾病',layer:'clinical',r:22,category:'immuno'},
+  {id:'抗肿瘤\n药物',layer:'clinical',r:23,category:'onco'},
+  {id:'肿瘤',layer:'clinical',r:21,category:'onco'},
+  {id:'眼科耳鼻喉\n口腔用药',layer:'clinical',r:22,category:'special'},
+  {id:'慢病\n管理',layer:'service',r:27,category:'service'},
+  {id:'用药安全',layer:'service',r:25,category:'service'},
+  {id:'处方审核\n与调剂',layer:'service',r:24,category:'service'},
+  {id:'用药咨询\n与治疗管理',layer:'service',r:24,category:'service'},
+  {id:'常见病症\n健康管理',layer:'service',r:24,category:'service'},
 ];
 
 const rawEdges=[
-  ['pharm_toxicology','receptor','main'],['pharm_toxicology','enzyme','main'],['pharm_toxicology','ion_channel','main'],
-  ['pharm_toxicology','transporter','main'],['pharm_toxicology','hormone','main'],['pharm_toxicology','pathogen','main'],
-  ['med_chemistry','receptor','main'],['med_chemistry','enzyme','main'],['med_chemistry','ion_channel','main'],
-  ['life_pharmacy','receptor','main'],['life_pharmacy','hormone','main'],['life_pharmacy','ion_channel','main'],
-  ['receptor','neuro_drug','main'],['receptor','cardio_drug','main'],['receptor','endo_drug','main'],
-  ['enzyme','cardio_drug','main'],['enzyme','endo_drug','main'],['enzyme','anti_infective','main'],
-  ['enzyme','anticancer','main'],['enzyme','antipyretic_analgesic','main'],
-  ['ion_channel','neuro_drug','main'],['ion_channel','cardio_drug','main'],['ion_channel','uro_drug','main'],
-  ['transporter','neuro_drug','main'],['transporter','endo_drug','main'],
-  ['hormone','endo_drug','main'],['hormone','anticancer','main'],['hormone','antipyretic_analgesic','main'],
-  ['pathogen','anti_infective','main'],
-  ['receptor','resp_drug','main'],['receptor','digest_drug','main'],
-  ['receptor','skin_drug','main'],['receptor','uro_drug','main'],
-  ['neuro_drug','neuro_disease','main'],
-  ['resp_drug','resp_disease','main'],
-  ['digest_drug','digest_disease','main'],
-  ['cardio_drug','cardio_disease','main'],
-  ['blood_drug','cardio_disease','main'],
-  ['endo_drug','endo_disease','main'],
-  ['uro_drug','uro_disease','main'],
-  ['anti_infective','immuno_disease','main'],
-  ['antipyretic_analgesic','immuno_disease','main'],
-  ['skin_drug','immuno_disease','main'],
-  ['anticancer','cancer','main'],
-  ['pharmacokinetics','prescription','main'],['pharmacokinetics','consultation','main'],['pharmacokinetics','chronic_disease','main'],
-  ['pharmaceutics','prescription','main'],['pharm_toxicology','drug_safety','main'],
-  ['life_pharmacy','common_health','main'],
-  ['cardio_drug','endo_drug','net'],
-  ['cardio_drug','chronic_disease','net'],
-  ['endo_drug','chronic_disease','net'],
-  ['cardio_disease','endo_disease','net'],
-  ['anti_infective','resp_disease','net'],
-  ['anti_infective','uro_disease','net'],
-  ['antipyretic_analgesic','common_health','net'],
-  ['anticancer','drug_safety','net'],
-  ['prescription','consultation','net'],
-  ['consultation','drug_safety','net'],
+  ['药理毒理学','受体','main'],['药理毒理学','酶','main'],['药理毒理学','离子通道','main'],
+  ['药理毒理学','转运体','main'],['药理毒理学','激素','main'],['药理毒理学','病原体','main'],
+  ['药物化学','受体','main'],['药物化学','酶','main'],['药物化学','离子通道','main'],
+  ['生命药学','受体','main'],['生命药学','激素','main'],['生命药学','离子通道','main'],
+  ['受体','精神与\n中枢神经用药','main'],['受体','心血管系统\n用药','main'],['受体','内分泌系统\n用药','main'],
+  ['酶','心血管系统\n用药','main'],['酶','内分泌系统\n用药','main'],['酶','抗感染\n药物','main'],
+  ['酶','抗肿瘤\n药物','main'],['酶','解热镇痛\n抗炎抗风湿','main'],
+  ['离子通道','精神与\n中枢神经用药','main'],['离子通道','心血管系统\n用药','main'],['离子通道','泌尿系统\n用药','main'],
+  ['转运体','精神与\n中枢神经用药','main'],['转运体','内分泌系统\n用药','main'],
+  ['激素','内分泌系统\n用药','main'],['激素','抗肿瘤\n药物','main'],['激素','解热镇痛\n抗炎抗风湿','main'],
+  ['病原体','抗感染\n药物','main'],
+  ['受体','呼吸系统\n用药','main'],['受体','消化系统\n用药','main'],
+  ['受体','皮肤用药\n及抗过敏','main'],['受体','泌尿系统\n用药','main'],
+  ['精神与\n中枢神经用药','神经系统\n常见疾病','main'],
+  ['呼吸系统\n用药','呼吸系统\n常见疾病','main'],
+  ['消化系统\n用药','消化系统\n常见疾病','main'],
+  ['心血管系统\n用药','心血管系统\n常见疾病','main'],
+  ['血液系统\n用药','心血管系统\n常见疾病','main'],
+  ['内分泌系统\n用药','内分泌系统\n常见疾病','main'],
+  ['泌尿系统\n用药','泌尿系统\n常见疾病','main'],
+  ['抗感染\n药物','免疫系统\n常见疾病','main'],
+  ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','main'],
+  ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','main'],
+  ['抗肿瘤\n药物','肿瘤','main'],
+  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢病\n管理','main'],
+  ['药剂学','处方审核\n与调剂','main'],['药理毒理学','用药安全','main'],
+  ['生命药学','常见病症\n健康管理','main'],
+  ['心血管系统\n用药','内分泌系统\n用药','net'],
+  ['心血管系统\n用药','慢病\n管理','net'],
+  ['内分泌系统\n用药','慢病\n管理','net'],
+  ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
+  ['抗感染\n药物','呼吸系统\n常见疾病','net'],
+  ['抗感染\n药物','泌尿系统\n常见疾病','net'],
+  ['解热镇痛\n抗炎抗风湿','常见病症\n健康管理','net'],
+  ['抗肿瘤\n药物','用药安全','net'],
+  ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
+  ['用药咨询\n与治疗管理','用药安全','net'],
   // V4.1: 修复孤立节点和增强连通性
-  ['pharmaceutics','ent_drug','main'],
-  ['receptor','ent_drug','main'],
-  ['pathogen','ent_drug','main'],
-  ['ent_drug','common_health','net'],
-  ['pharmacokinetics','fluid_nutrition','main'],
-  ['fluid_nutrition','uro_disease','main'],
-  ['pharmacokinetics','drug_safety','main'],
-  ['cardio_drug','drug_safety','net'],
-  ['endo_drug','drug_safety','net'],
-  ['anti_infective','drug_safety','net'],
+  ['药剂学','眼科耳鼻喉\n口腔用药','main'],
+  ['受体','眼科耳鼻喉\n口腔用药','main'],
+  ['病原体','眼科耳鼻喉\n口腔用药','main'],
+  ['眼科耳鼻喉\n口腔用药','常见病症\n健康管理','net'],
+  ['药物动力学','水电解质\n营养用药','main'],
+  ['水电解质\n营养用药','泌尿系统\n常见疾病','main'],
+  ['药物动力学','用药安全','main'],
+  ['心血管系统\n用药','用药安全','net'],
+  ['内分泌系统\n用药','用药安全','net'],
+  ['抗感染\n药物','用药安全','net'],
 ];
 
 // System groupings for background frames
 const CATEGORY_GROUPS={
-  foundation:['pharm_toxicology','life_pharmacy','med_chemistry','pharmacokinetics','pharmaceutics'],
-  bridge:['receptor','enzyme','ion_channel','transporter','hormone','pathogen'],
-  neuro: ['neuro_drug','neuro_disease'],
-  resp:  ['resp_drug','resp_disease'],
-  digest:['digest_drug','digest_disease'],
-  cardio:['cardio_drug','blood_drug','cardio_disease'],
-  endo:  ['endo_drug','endo_disease'],
-  uro:   ['uro_drug','fluid_nutrition','uro_disease'],
-  immuno:['anti_infective','antipyretic_analgesic','skin_drug','immuno_disease'],
-  onco:  ['anticancer','cancer'],
-  special:['ent_drug'],
-  service:['chronic_disease','drug_safety','prescription','consultation','common_health'],
+  foundation:['药理毒理学','生命药学','药物化学','药物动力学','药剂学'],
+  bridge:['受体','酶','离子通道','转运体','激素','病原体'],
+  neuro: ['精神与\n中枢神经用药','神经系统\n常见疾病'],
+  resp:  ['呼吸系统\n用药','呼吸系统\n常见疾病'],
+  digest:['消化系统\n用药','消化系统\n常见疾病'],
+  cardio:['心血管系统\n用药','血液系统\n用药','心血管系统\n常见疾病'],
+  endo:  ['内分泌系统\n用药','内分泌系统\n常见疾病'],
+  uro:   ['泌尿系统\n用药','水电解质\n营养用药','泌尿系统\n常见疾病'],
+  immuno:['抗感染\n药物','解热镇痛\n抗炎抗风湿','皮肤用药\n及抗过敏','免疫系统\n常见疾病'],
+  onco:  ['抗肿瘤\n药物','肿瘤'],
+  special:['眼科耳鼻喉\n口腔用药'],
+  service:['慢病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理'],
 };
 
 const CATEGORY_LABELS={
@@ -481,6 +527,23 @@ const CATEGORY_LABELS={
 };
 
 // ═══════════════════════════════════════════════════
+// PHYSICS CONSTANTS (module scope — easy to tune)
+// ═══════════════════════════════════════════════════
+const S_REPULSE_K = 45000;
+const S_TARGET_F  = 1.8;
+const S_ALPHA     = 0.35;
+const EM_K        = 28000;   // stronger same-layer repulsion → systems push apart in 2D
+const EM_RANGE    = 600;     // longer range → feel each other across the wider world
+const EM_MAX_F    = 30;
+const G_WELL_K    = 0.025;   // weaker Y-well → nodes free to spread vertically inside band
+const G_CORE_REP  = 50000;
+const G_CORE_DAMP = 0.78;
+const W_BOUND_K   = 0.40;
+const W_DAMP_PHYS = 0.985;
+const W_TOP_PAD   = 0.04;
+const W_BOT_PAD   = 0.04;
+
+// ═══════════════════════════════════════════════════
 // ENGINE
 // ═══════════════════════════════════════════════════
 const canvas=document.getElementById('c');
@@ -488,19 +551,8 @@ const ctx=canvas.getContext('2d');
 const wrap=document.getElementById('canvas-wrap');
 const DPR=window.devicePixelRatio||1;
 
-let W,H;
-
-function resize(){
-  W=wrap.clientWidth;
-  H=wrap.clientHeight;
-  canvas.width=W*DPR;
-  canvas.height=H*DPR;
-  canvas.style.width=W+'px';
-  canvas.style.height=H+'px';
-  ctx.scale(DPR,DPR);
-  initPositions();
-  runForce(200);
-}
+let LW, LH;  // computed after node radii are set
+let W, H;    // screen pixels
 
 // Node objects with physics
 const nodes=rawNodes.map(n=>({
@@ -520,25 +572,51 @@ rawEdges.forEach(([a,b])=>{adj[a].add(b);adj[b].add(a);});
 nodes.forEach(n=>n.degree=adj[n.id].size);
 
 // Scale radius by degree (增强团块感)
-// 多连接节点更大，增强视觉层次和团块感
 nodes.forEach(n=>{
   const base=rawNodes.find(r=>r.id===n.id).r;
-  n.r=base+Math.min(n.degree*1.2,12); // 增大degree影响，最大增加12
+  n.r=base+Math.min(n.degree*1.2,12);
 });
 
+// Compute logical world size now that radii are final (called after LAYER_ORDER is defined below)
+
 function initPositions(){
-  const cx=W/2;
-  // 初始化层核位置（均匀分布）
-  LAYER_ORDER.forEach((l,i)=>{
-    layerCores[l].y=(i+1)/(LAYER_ORDER.length+1)*H;
-    layerCores[l].vy=0;
+  const NODE_GAP = 52;
+  const LAYER_VPAD = 120;
+  const H_MARGIN = 100;
+
+  // 按层计算实际所需高度（与 computeWorldSize 一致的逻辑）
+  const byLayer={};
+  LAYER_ORDER.forEach(l=>byLayer[l]=[]);
+  nodes.forEach(n=>byLayer[n.layer].push(n));
+
+  const bandHeights={};
+  LAYER_ORDER.forEach(l=>{
+    const ns=byLayer[l];
+    if(!ns.length){bandHeights[l]=LAYER_VPAD;return;}
+    const maxDiam=Math.max(...ns.map(n=>n.r*2));
+    const cellSize=maxDiam+NODE_GAP;
+    const rows=Math.max(1,Math.ceil(Math.sqrt(ns.length*0.6)));
+    bandHeights[l]=rows*cellSize+LAYER_VPAD;
   });
-  // 节点初始位置：X均匀随机分布，Y在层核附近较大范围内随机
+
+  // 分配层核 Y（从上往下累加实际带高）
+  let cumY=H_MARGIN;
+  LAYER_ORDER.forEach(l=>{
+    const bh=bandHeights[l];
+    layerCores[l].y=cumY+bh/2;
+    layerCores[l].bandH=bh;
+    layerCores[l].vy=0;
+    cumY+=bh;
+  });
+
+  // 节点初始位置：在本层带内随机散开
   nodes.forEach(n=>{
-    const coreY=layerCores[n.layer].y;
-    n.x=cx+(Math.random()-0.5)*W*0.6;  // X轴大范围随机分布
-    n.y=coreY+(Math.random()-0.5)*H*0.25; // Y轴在层核附近随机（允许二维分布）
-    n.vx=0; n.vy=0; n.pinned=false;
+    const core=layerCores[n.layer];
+    const halfBand=(core.bandH)*0.42;
+    const xSpread = n.layer==='clinical' ? 0.82 : 0.60;
+    n.x=LW/2+(Math.random()-0.5)*LW*xSpread;
+    n.y=core.y+(Math.random()-0.5)*halfBand*2;
+    n.vx=0;n.vy=0;n.pinned=false;
   });
 }
 
@@ -577,68 +655,67 @@ const LAYER_ORDER=['foundation','bridge','clinical','service'];
 
 // 层核：每层一个虚拟质心天体，位置动态更新
 const layerCores={};
-LAYER_ORDER.forEach((l,i)=>{
-  layerCores[l]={y: H*0.2 + Math.random()*H*0.6, vy:0};
-});
+LAYER_ORDER.forEach(l=>{ layerCores[l]={y:0, vy:0}; });
+
+// ── 世界尺寸：根据节点实际体积反向推算，保证每层不拥挤 ──
+function computeWorldSize(){
+  const NODE_GAP = 52;    // 节点间距加大
+  const LAYER_VPAD = 120; // 层间垂直留白加大
+  const H_MARGIN = 100;   // 上下边距加大
+  const byLayer={};
+  LAYER_ORDER.forEach(l=>byLayer[l]=[]);
+  nodes.forEach(n=>byLayer[n.layer].push(n));
+  let totalH = H_MARGIN * 2;
+  let maxLayerW = 0;
+  LAYER_ORDER.forEach(l=>{
+    const ns = byLayer[l];
+    if(!ns.length) return;
+    const maxDiam = Math.max(...ns.map(n=>n.r*2));
+    const cellSize = maxDiam + NODE_GAP;
+    const rows = Math.max(1, Math.ceil(Math.sqrt(ns.length * 0.6)));
+    const cols = Math.ceil(ns.length / rows);
+    const layerH = rows * cellSize + LAYER_VPAD;
+    const layerW = cols * cellSize + 200; // 左右各100
+    totalH += layerH;
+    if(layerW > maxLayerW) maxLayerW = layerW;
+  });
+  return { LW: Math.max(maxLayerW, 1200), LH: Math.max(totalH, 1000) };
+}
+
+function fitView(){
+  const fitZoom = Math.min(W/LW, H/LH) * 0.92;
+  zoom = fitZoom;
+  pan.x = (W - LW*zoom) / 2;
+  pan.y = (H - LH*zoom) / 2;
+}
+
+function resize(){
+  W=wrap.clientWidth;
+  H=wrap.clientHeight;
+  canvas.width=W*DPR;
+  canvas.height=H*DPR;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.scale(DPR,DPR);
+  fitView();
+  initPositions();
+  runForce(400);
+}
+
+// 现在 LAYER_ORDER 和 nodes 都已就绪，计算世界尺寸
+({LW, LH} = computeWorldSize());
 
 function runForce(steps){
   const pad=50;
   const damp=0.82;
   const MAX_V=25;
 
-  // ── 强相互作用力 ──────────────────────────────
-  // 同类节点间：近排远吸，作用范围有限，有明确平衡距离
-  // 物理参数已提升到模块顶部统一管理
-  const G_CORE_DAMP = 0.78;    // 层核速度阻尼
-
-  // ── 弱相互作用力 ──────────────────────────────
-  // 边界恢复弹力：只防止节点跑出画布，不限制层内分布
-  const W_BOUND_K   = 0.40;    // 边界恢复弹力系数
-  const W_DAMP      = 0.985;   // 边界力衰减系数
-  const W_TOP_PAD   = 0.05;    // 顶部边界余量
-  const W_BOT_PAD   = 0.05;    // 底部边界余量
+  // Physics constants defined at module scope above
 
   for(let step=0;step<steps;step++){
     const alpha = Math.max(0, 1 - step/steps);
 
-    // ════════════════════════════════════════════
-    // 【引力 Part A】更新层核 Y 位置
-    // 层核是独立物理实体，只受：
-    // 1. 其他层核的排斥力（使用G_CORE_REP）
-    // 2. 边界恢复力
-    // 不追踪节点质心，避免层漂移
-    // ════════════════════════════════════════════
-    // 层核之间互相排斥
-    for(let i=0;i<LAYER_ORDER.length;i++){
-      for(let j=i+1;j<LAYER_ORDER.length;j++){
-        const ca=layerCores[LAYER_ORDER[i]];
-        const cb=layerCores[LAYER_ORDER[j]];
-        const dy=cb.y-ca.y;
-        const dist=Math.max(Math.abs(dy), 30);
-        // 使用 G_CORE_REP 实现层核之间的斥力（类似电磁力）
-        const repF=Math.min(G_CORE_REP/(dist*dist), 15);
-        const dir=dy>=0?1:-1;
-        ca.vy-=dir*repF;
-        cb.vy+=dir*repF;
-      }
-    }
-    // 层核边界恢复力（防止层核跑出画布）
-    LAYER_ORDER.forEach(l=>{
-      const c=layerCores[l];
-      const coreMargin=H*0.12;
-      // 顶部边界
-      if(c.y < coreMargin){
-        c.vy += (coreMargin - c.y) * 0.08;
-      }
-      // 底部边界
-      if(c.y > H - coreMargin){
-        c.vy += (H - coreMargin - c.y) * 0.08;
-      }
-      // 阻尼和位置更新
-      c.vy *= G_CORE_DAMP;
-      c.y += c.vy;
-      c.y = Math.max(H*0.08, Math.min(H*0.92, c.y));
-    });
+    // 层核位置固定（由 initPositions 预分配），无需互斥更新
 
     // ════════════════════════════════════════════
     // 【强相互作用力】重构：簇心吸引 + 节点间排斥
@@ -742,40 +819,36 @@ function runForce(steps){
     }
 
     // ════════════════════════════════════════════
-    // 【层势阱 Gravity】节点被本层吸引
-    // 向层核方向靠拢，但不固定Y坐标
-    // 层与层之间可以自由浮动
+    // 【引力】层带约束：带内轻柔，超出边界强力弹回
     // ════════════════════════════════════════════
-
     nodes.forEach(n=>{
       if(n.pinned)return;
-      const coreY=layerCores[n.layer].y;
-      // Y方向引力：拉向层核Y坐标
-      const dyToCore=coreY-n.y;
-      n.vy+=dyToCore*G_WELL_K;
+      const core=layerCores[n.layer];
+      const dy=core.y-n.y;
+      const halfBand=(core.bandH||200)*0.5;
+      const relDist=Math.abs(dy)/halfBand;
+      // 带内几乎不拉（让节点自由二维分布）；超出带边界强力弹回
+      let k;
+      if(relDist < 0.7)       k = G_WELL_K * 0.3;
+      else if(relDist < 1.0)  k = G_WELL_K;
+      else                     k = G_WELL_K * (1 + (relDist-1)*12); // 硬墙
+      n.vy += dy * k;
     });
 
     // ════════════════════════════════════════════
-    // 【弱相互作用力】边界恢复弹力
-    // 防止节点跑出画布边界，不干扰团块形成
+    // 【弱相互作用力】边界恢复弹力 — 基于逻辑世界尺寸
     // ════════════════════════════════════════════
-    const weakK = W_BOUND_K * Math.pow(W_DAMP, step); // 逐渐减弱，避免振荡
-    const topPad = H * W_TOP_PAD;
-    const botPad = H * W_BOT_PAD;
+    const weakK = W_BOUND_K * Math.pow(W_DAMP_PHYS, step);
+    const topPad = LH * W_TOP_PAD;
+    const botPad = LH * W_BOT_PAD;
     nodes.forEach(n=>{
       if(n.pinned)return;
-      // 顶部边界恢复
-      if(n.y < topPad + n.r){
-        n.vy += (topPad + n.r - n.y) * weakK;
-      }
-      // 底部边界恢复
-      if(n.y > H - botPad - n.r){
-        n.vy += (H - botPad - n.r - n.y) * weakK;
-      }
+      if(n.y < topPad + n.r) n.vy += (topPad + n.r - n.y) * weakK;
+      if(n.y > LH - botPad - n.r) n.vy += (LH - botPad - n.r - n.y) * weakK;
     });
 
     // ════════════════════════════════════════════
-    // 速度积分 + 阻尼 + 边界
+    // 速度积分 + 阻尼 + 软边界
     // ════════════════════════════════════════════
     nodes.forEach(n=>{
       if(n.pinned)return;
@@ -784,28 +857,25 @@ function runForce(steps){
       if(spd>MAX_V){n.vx=n.vx/spd*MAX_V; n.vy=n.vy/spd*MAX_V;}
       n.x+=n.vx; n.y+=n.vy;
       if(!isFinite(n.x)||!isFinite(n.y)){
-        n.x=W/2+(Math.random()-0.5)*80;
-        n.y=layerCores[n.layer]?.y||(H*0.5);
+        n.x=LW/2+(Math.random()-0.5)*80;
+        n.y=layerCores[n.layer]?.y||(LH*0.5);
         n.vx=0; n.vy=0;
       }
-      n.x=Math.max(pad+n.r, Math.min(W-pad-n.r, n.x));
-      n.y=Math.max(pad+n.r, Math.min(H-pad-n.r, n.y));
+      // Soft clamp — nodes stay within logical world
+      n.x=Math.max(pad+n.r, Math.min(LW-pad-n.r, n.x));
+      n.y=Math.max(pad+n.r, Math.min(LH-pad-n.r, n.y));
     });
   }
-  
-  // 计算总运动能量
-  totalEnergy=nodes.reduce((sum,n)=>sum+Math.sqrt(n.vx*n.vx+n.vy*n.vy),0);
-  framesDirty=true;  // 标记帧缓存需要更新
-  return totalEnergy;
 }
 
 // ═══════════════════════════════════════════════════
 // INTERACTION STATE
 // ═══════════════════════════════════════════════════
 let hovered=null;
-let locked=null;       // locked node id
-// let activeSystem=null; // system filter (已禁用)
-let drag=null;         // {node, ox, oy}
+let locked=null;
+let searchQuery='';
+let drag=null;
+let _didDrag=false;
 
 // Pan / zoom
 let pan={x:0,y:0};
@@ -838,18 +908,21 @@ function showPanel(nodeId, mouseX, mouseY){
   let px = mouseX + 15;
   let py = mouseY + 15;
   const panelW = 220;
-  const panelH = panel.offsetHeight || 200; // 动态读取实际高度
-  if(px + panelW > W - 10) px = mouseX - panelW - 15;
-  if(py + panelH > H - 10) py = mouseY - panelH - 15;
-  panel.style.left = px + 'px';
-  panel.style.top = py + 'px';
-
   panel.classList.add('visible');
+  // Use real rendered height to avoid overflow
+  requestAnimationFrame(()=>{
+    const panelH = panel.offsetHeight || 200;
+    if(px + panelW > W - 10) px = mouseX - panelW - 15;
+    if(py + panelH > H - 10) py = mouseY - panelH - 15;
+    px = Math.max(6, px); py = Math.max(6, py);
+    panel.style.left = px + 'px';
+    panel.style.top = py + 'px';
+  });
   const info=NODE_INFO[nodeId]||{};
   const n=nmap[nodeId];
   const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
 
-  document.getElementById('info-panel-name').textContent=info.label||nodeId;
+  document.getElementById('info-panel-name').textContent=nodeId.replace(/\n/g,'');
 
   const codeEl=document.getElementById('info-panel-code');
   codeEl.textContent=info.code||'';
@@ -873,16 +946,22 @@ function showPanel(nodeId, mouseX, mouseY){
     });
     let html='';
     if(upstream.length){
-      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${NODE_INFO[id]?.label||id}</span>`).join('')}</div>`;
+      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
     }
     if(downstream.length){
-      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${NODE_INFO[id]?.label||id}</span>`).join('')}</div>`;
+      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
     }
     linksEl.innerHTML=html;
   } else {
     linksEl.innerHTML='';
   }
   panel.classList.add('visible');
+}
+
+function updateLockedPanelPos(){
+  if(!locked) return;
+  const n=nmap[locked]; if(!n) return;
+  showPanel(locked, n.x*zoom+pan.x, n.y*zoom+pan.y);
 }
 
 // ═══════════════════════════════════════════════════
@@ -893,62 +972,49 @@ function computeGroupFrames(){
   Object.entries(CATEGORY_GROUPS).forEach(([sys,ids])=>{
     const ns=ids.map(id=>nmap[id]).filter(Boolean);
     if(!ns.length)return;
-    const pad=28+Math.max(...ns.map(n=>n.r));
+    const maxR=Math.max(...ns.map(n=>n.r));
+    const pad=maxR+16;  // tighter pad — just enough clearance around the outermost node
     const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y);
     frames[sys]={
       minX:Math.min(...xs)-pad,
       maxX:Math.max(...xs)+pad,
-      minY:Math.min(...ys)-pad-12,
+      minY:Math.min(...ys)-pad-14,  // extra 14 for label
       maxY:Math.max(...ys)+pad,
     };
   });
   return frames;
 }
 
-// ═══════════════════════════════════════════════════
-// CACHE & OPTIMIZATION
-// ═══════════════════════════════════════════════════
-// 缓存：只在下一次物理迭代前失效
-let cachedFrames=null;
-let framesDirty=true;
-
-function getGroupFrames(){
-  if(framesDirty){
-    cachedFrames=computeGroupFrames();
-    framesDirty=false;
-  }
-  return cachedFrames;
-}
-
-// 运动能量检测：低于阈值时暂停渲染循环
-let totalEnergy=Infinity;
-let lastRenderTime=0;
-let isSleeping=false;
-const ENERGY_THRESHOLD=0.5;  // 总能量阈值
-const MIN_DELTA_TIME=16;      // 最小帧间隔(ms)
-
 function drawGroupBg(frames){
+  // First pass: filled backgrounds (clipped to own rect)
   Object.entries(frames).forEach(([sys,f])=>{
     const bg=CATEGORY_BG[sys]||'rgba(200,200,200,0.05)';
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,14);
+    ctx.clip();
+    ctx.fillStyle=bg;
+    ctx.fill();
+    ctx.restore();
+  });
+  // Second pass: strokes + labels (no clip needed, stroke is thin)
+  Object.entries(frames).forEach(([sys,f])=>{
     const stroke=CATEGORY_COLORS[sys]?.stroke||'#ccc';
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,16);
-    ctx.fillStyle=bg;
-    ctx.fill();
-    ctx.strokeStyle=stroke+'28';
+    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,14);
+    ctx.strokeStyle=stroke+'30';
     ctx.lineWidth=1;
     ctx.stroke();
     ctx.restore();
 
-    // Label: top-outside the frame
     ctx.save();
     ctx.font='600 9px Noto Sans SC,sans-serif';
     ctx.textAlign='left';
     ctx.textBaseline='bottom';
     ctx.fillStyle=CATEGORY_COLORS[sys]?.stroke||'#888';
-    ctx.globalAlpha=0.7;
-    ctx.fillText(CATEGORY_LABELS[sys]||sys, f.minX+6, f.minY-2);
+    ctx.globalAlpha=0.65;
+    ctx.fillText(CATEGORY_LABELS[sys]||sys, f.minX+6, f.minY+1);
     ctx.restore();
   });
 }
@@ -995,13 +1061,13 @@ function drawNode(n,highlighted){
   const isHovered=hovered===n.id;
   const isLocked=locked===n.id;
   const isActive=!highlighted||highlighted.has(n.id);
-  const isSysFilter=!activeSystem||(CATEGORY_GROUPS[activeSystem]||[]).includes(n.id)
-    ||(n.category==='bridge');
+  const inSearch=!searchQuery||n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery)||
+    [...adj[n.id]].some(nb=>nb.replace(/\n/g,'').toLowerCase().includes(searchQuery));
 
   ctx.save();
   let alpha=1;
   if(!isActive)alpha=0.07;
-  else if(!isSysFilter)alpha=0.15;
+  else if(searchQuery&&!inSearch)alpha=0.1;
   ctx.globalAlpha=alpha;
 
   const scale=isHovered||isLocked?1.12:1;
@@ -1041,6 +1107,12 @@ function drawNode(n,highlighted){
     ctx.setLineDash([]);
   }
 
+  // Search match highlight ring
+  if(searchQuery&&n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery)&&!isHovered&&!isLocked){
+    ctx.beginPath();ctx.arc(n.x,n.y,nodeR+4,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+'aa';ctx.lineWidth=2;ctx.setLineDash([3,2]);ctx.stroke();ctx.setLineDash([]);
+  }
+
   // Text
   ctx.globalAlpha=alpha;
   ctx.fillStyle=colors.text;
@@ -1048,30 +1120,18 @@ function drawNode(n,highlighted){
   ctx.font=(isHovered||isLocked?'700':'500')+' '+fontSize+'px Noto Sans SC,sans-serif';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  const label=NODE_INFO[n.id]?.label||n.id;
-  // 按词语换行（每2-4个字一行，根据节点大小调整）
-  const maxChars=n.r>28?4:n.r>22?3:2;
-  const words=label.match(new RegExp('.{1,'+maxChars+'}','g'))||[label];
-  const lh=fontSize+2;
-  words.forEach((line,i)=>{
-    ctx.fillText(line,n.x,n.y-(words.length-1)*lh/2+i*lh);
+  const lines=n.id.split('\n');
+  const lh=fontSize+3;
+  lines.forEach((line,i)=>{
+    ctx.fillText(line,n.x,n.y-(lines.length-1)*lh/2+i*lh);
   });
 
   ctx.restore();
 }
 
 function lighten(hex,amt){
-  // 将hex颜色变亮amt（0-1），返回新的hex
-  // 支持 #RRGGBB 格式
-  const r=parseInt(hex.slice(1,3),16);
-  const g=parseInt(hex.slice(3,5),16);
-  const b=parseInt(hex.slice(5,7),16);
-  const nr=Math.min(255, Math.round(r + (255-r)*amt));
-  const ng=Math.min(255, Math.round(g + (255-g)*amt));
-  const nb=Math.min(255, Math.round(b + (255-b)*amt));
-  return '#' + nr.toString(16).padStart(2,'0')
-             + ng.toString(16).padStart(2,'0')
-             + nb.toString(16).padStart(2,'0');
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return'rgb('+Math.round(r+(255-r)*amt)+','+Math.round(g+(255-g)*amt)+','+Math.round(b+(255-b)*amt)+')';
 }
 
 function render(){
@@ -1085,28 +1145,12 @@ function render(){
   ctx.translate(pan.x,pan.y);
   ctx.scale(zoom,zoom);
 
-  const frames=getGroupFrames();  // 使用缓存的frames
-
-  // Active system highlight overlay
-  if(activeSystem){
-    ctx.save();
-    ctx.fillStyle='rgba(240,245,255,0.5)';
-    ctx.fillRect(-pan.x/zoom,-pan.y/zoom,W/zoom,H/zoom);
-    ctx.restore();
-  }
+  const frames=computeGroupFrames();
 
   drawGroupBg(frames);
 
   const focusId=locked||hovered;
   const highlighted=focusId?getHighlighted(focusId):null;
-
-  // System filter: build set
-  let sysSet=null;
-  if(activeSystem){
-    sysSet=new Set(CATEGORY_GROUPS[activeSystem]||[]);
-    // always show core/bridge
-    nodes.forEach(n=>{if(n.category==='bridge')sysSet.add(n.id);});
-  }
 
   // Edges
   rawEdges.forEach(([a,b,type])=>{
@@ -1119,26 +1163,7 @@ function render(){
 
   ctx.restore();
 
-  // 运动能量检测：节点稳定时暂停渲染
-  const now=performance.now();
-  if(isSleeping){
-    // 睡眠中，等待交互唤醒
-  } else if(totalEnergy < ENERGY_THRESHOLD && now - lastRenderTime > 100){
-    // 能量低且超过100ms，暂停渲染
-    isSleeping=true;
-  } else {
-    lastRenderTime=now;
-    requestAnimationFrame(render);
-  }
-}
-
-// 交互时唤醒渲染循环
-function wakeUpRender(){
-  if(isSleeping){
-    isSleeping=false;
-    lastRenderTime=performance.now();
-    requestAnimationFrame(render);
-  }
+  requestAnimationFrame(render);
 }
 
 // ═══════════════════════════════════════════════════
@@ -1155,7 +1180,7 @@ function getNodeAt(cx,cy){
 
 function getGroupAt(cx,cy){
   const {x,y}=toWorld(cx,cy);
-  const frames=getGroupFrames();  // 使用缓存
+  const frames=computeGroupFrames();
   for(const [sys,f] of Object.entries(frames)){
     if(x>=f.minX && x<=f.maxX && y>=f.minY && y<=f.maxY){
       return {sys, frame:f};
@@ -1170,61 +1195,48 @@ canvas.addEventListener('mousemove',e=>{
   const cy=e.clientY-rect.top;
 
   if(drag){
+    _didDrag=true;
     const {x,y}=toWorld(cx,cy);
-    if(drag.type==='node'){
+    if(drag.type==='pan'){
+      pan.x=drag.startPanX+(cx-drag.startX);
+      pan.y=drag.startPanY+(cy-drag.startY);
+      canvas.style.cursor='grabbing';
+      return;
+    } else if(drag.type==='node'){
       drag.node.x=x;
       drag.node.y=y;
       drag.node.vx=0;drag.node.vy=0;
-      // 锁定状态下跟随节点移动
-      if(locked===drag.node.id){
-        const screenX=drag.node.x*zoom+pan.x;
-        const screenY=drag.node.y*zoom+pan.y;
-        showPanel(locked,screenX,screenY);
-      }
+      if(locked) updateLockedPanelPos();
     } else if(drag.type==='group'){
-      // 先获取旧的框位置（在移动任何节点之前）
       const oldFrame=computeGroupFrames()[drag.sys];
       if(!oldFrame)return;
-      
-      // 计算新的框左上角位置
       const newMinX=x-drag.offsetX;
       const newMinY=y-drag.offsetY;
-      
-      // 计算偏移量
       const dx=newMinX-oldFrame.minX;
       const dy=newMinY-oldFrame.minY;
-      
-      // 移动该类所有节点
       (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
         const node=nmap[id];
-        if(node){
-          node.x+=dx;
-          node.y+=dy;
-          node.vx=0;node.vy=0;
-        }
+        if(node){node.x+=dx;node.y+=dy;node.vx=0;node.vy=0;}
       });
     }
     return;
   }
 
   const n=getNodeAt(cx,cy);
-  if(n){
-    hovered=n.id;
-    canvas.style.cursor='pointer';
-    if(!locked)showPanel(n.id, cx, cy);
-    return;
+  hovered=n?n.id:null;
+  if(n){ canvas.style.cursor='pointer'; }
+  else {
+    const group=getGroupAt(cx,cy);
+    canvas.style.cursor=group?'move':'grab';
   }
-  // 未命中节点才检查group
-  const group=getGroupAt(cx,cy);
-  hovered=null;
-  canvas.style.cursor=group?'pointer':'default';
 
   if(!locked){
-    showPanel(null, cx, cy);
+    showPanel(n?n.id:null, cx, cy);
   }
 });
 
 canvas.addEventListener('click',e=>{
+  if(_didDrag)return; // was a drag, not a click
   const rect=canvas.getBoundingClientRect();
   const cx=e.clientX-rect.left;
   const cy=e.clientY-rect.top;
@@ -1239,20 +1251,18 @@ canvas.addEventListener('click',e=>{
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0)return;
-  wakeUpRender();  // 交互时唤醒渲染循环
   const rect=canvas.getBoundingClientRect();
   const cx=e.clientX-rect.left;
   const cy=e.clientY-rect.top;
-  
-  // 优先检查节点
+  _didDrag=false;
+
+  // Priority: node > group > canvas pan
   const n=getNodeAt(cx,cy);
   if(n){
     drag={node:n, type:'node'};
     n.pinned=true;
     return;
   }
-  
-  // 检查类背景框
   const group=getGroupAt(cx,cy);
   if(group){
     const {x,y}=toWorld(cx,cy);
@@ -1262,12 +1272,13 @@ canvas.addEventListener('mousedown',e=>{
       offsetX:x-group.frame.minX,
       offsetY:y-group.frame.minY
     };
-    // 锁定该类所有节点
     (CATEGORY_GROUPS[group.sys]||[]).forEach(id=>{
-      const node=nmap[id];
-      if(node)node.pinned=true;
+      const node=nmap[id]; if(node)node.pinned=true;
     });
+    return;
   }
+  // Empty canvas — pan
+  drag={type:'pan', startX:cx, startY:cy, startPanX:pan.x, startPanY:pan.y};
 });
 
 canvas.addEventListener('mouseup',()=>{
@@ -1276,32 +1287,26 @@ canvas.addEventListener('mouseup',()=>{
       drag.node.pinned=false;
     } else if(drag.type==='group'){
       (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
-        const node=nmap[id];
-        if(node)node.pinned=false;
+        const node=nmap[id]; if(node)node.pinned=false;
       });
     }
     drag=null;
+    canvas.style.cursor='default';
   }
 });
 
 canvas.addEventListener('mouseleave',()=>{
   if(drag){
-    if(drag.type==='node'){
-      drag.node.pinned=false;
-    } else if(drag.type==='group'){
-      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
-        const node=nmap[id];
-        if(node)node.pinned=false;
-      });
-    }
+    if(drag.type==='node') drag.node.pinned=false;
+    else if(drag.type==='group')(CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{if(nmap[id])nmap[id].pinned=false;});
     drag=null;
+    canvas.style.cursor='default';
   }
   hovered=null;
 });
 
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
-  wakeUpRender();  // 交互时唤醒渲染循环
   const rect=canvas.getBoundingClientRect();
   const mx=e.clientX-rect.left;
   const my=e.clientY-rect.top;
@@ -1316,21 +1321,64 @@ canvas.addEventListener('wheel',e=>{
 // CONTROLS
 // ═══════════════════════════════════════════════════
 
-// 图例点击toggle（支持移动端）
-const legendWrap=document.getElementById('legend-wrap');
-legendWrap.addEventListener('click',()=>{
-  legendWrap.classList.toggle('show');
-});
+// ── Legend click toggle (works on mobile too) ──
+(function(){
+  const legendToggle=document.getElementById('legend-toggle');
+  const legend=document.getElementById('legend');
+  legendToggle.addEventListener('click',e=>{e.stopPropagation();legend.classList.toggle('open');});
+  document.addEventListener('click',e=>{
+    if(!legend.contains(e.target)&&e.target!==legendToggle) legend.classList.remove('open');
+  });
+})();
 
-// 删除系统筛选功能（无UI入口）
-let activeSystem=null;
+// ── Search ──
+(function(){
+  const searchInput=document.getElementById('search-input');
+  const searchClear=document.getElementById('search-clear');
+  const searchBadge=document.getElementById('search-badge');
+  function applySearch(raw){
+    searchQuery=raw.trim().toLowerCase();
+    searchClear.classList.toggle('visible',searchQuery.length>0);
+    if(!searchQuery){
+      searchBadge.classList.remove('visible');
+    } else {
+      let directCount=0;
+      nodes.forEach(n=>{if(n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery))directCount++;});
+      searchBadge.textContent=directCount>0?('找到 '+directCount+' 个节点'):'无匹配节点';
+      searchBadge.classList.add('visible');
+    }
+  }
+  searchInput.addEventListener('input',e=>applySearch(e.target.value));
+  searchClear.addEventListener('click',()=>{searchInput.value='';applySearch('');searchInput.focus();});
+})();
 
-// Hide hint bar after 5s
+// ── BGM ──
+(function(){
+  const btn=document.getElementById('music-btn');
+  const audio=document.getElementById('bgm');
+  const iconPlay=document.getElementById('music-icon-play');
+  const iconPause=document.getElementById('music-icon-pause');
+  audio.volume=0.45;
+  let playing=false;
+  function setPlaying(v){
+    playing=v;
+    btn.classList.toggle('playing',v);
+    iconPlay.style.display=v?'none':'block';
+    iconPause.style.display=v?'block':'none';
+  }
+  btn.addEventListener('click',()=>{
+    if(playing){ audio.pause(); setPlaying(false); }
+    else { audio.play().then(()=>setPlaying(true)).catch(()=>{}); }
+  });
+  audio.addEventListener('ended',()=>setPlaying(false));
+})();
+
+// Hide hint bar after 4s
 setTimeout(()=>{
   const h=document.getElementById('hint-bar');
   h.style.opacity='0';
   setTimeout(()=>h.style.display='none',400);
-},5000);
+},4500);
 
 // ═══════════════════════════════════════════════════
 // INIT
@@ -1338,8 +1386,17 @@ setTimeout(()=>{
 resize();
 render();
 
+// Resize: keep logical world positions, just re-fit zoom to new screen size
+var _lastResizeW=W, _lastResizeH=H;
 window.addEventListener('resize',()=>{
-  resize();
+  var nW=wrap.clientWidth, nH=wrap.clientHeight;
+  if(nW===_lastResizeW && nH===_lastResizeH) return;
+  _lastResizeW=nW; _lastResizeH=nH;
+  W=nW; H=nH;
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.scale(DPR,DPR);
+  fitView();
 });
 </script>
 </body>
