@@ -441,10 +441,10 @@ const NODE_INFO={
   '呼吸系统\n常见疾病':{code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
   '消化系统\n用药':{code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
   '消化系统\n常见疾病':{code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
-  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢病管理。',category:'cardio'},
+  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢性病管理。',category:'cardio'},
   '血液系统\n用药':{code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
   '心血管系统\n常见疾病':{code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
-  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢病管理。',category:'endo'},
+  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢性病管理。',category:'endo'},
   '内分泌系统\n常见疾病':{code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
   '泌尿系统\n用药':{code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
   '水电解质\n营养用药':{code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
@@ -456,11 +456,13 @@ const NODE_INFO={
   '抗肿瘤\n药物':{code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
   '肿瘤':{code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
   '眼科耳鼻喉\n口腔用药':{code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
-  '慢病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
+  '慢性病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
   '用药安全':{code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
   '处方审核\n与调剂':{code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
   '用药咨询\n与治疗管理':{code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
   '常见病症\n健康管理':{code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
+  '药学服务\n与药品管理':{code:'B1 · 服务层',desc:'药品采购、储存、调配、发放与管理制度。支撑处方审核与调剂。',category:'service'},
+  '急救、中毒\n解救及职业防护':{code:'B5 · 服务层',desc:'急救药品管理、中毒解救方案与职业安全防护。关联用药安全。',category:'service'},
 };
 
 const CATEGORY_COLORS={
@@ -530,11 +532,13 @@ const rawNodes=[
   {id:'抗肿瘤\n药物',layer:'clinical',r:23,category:'onco'},
   {id:'肿瘤',layer:'clinical',r:21,category:'onco'},
   {id:'眼科耳鼻喉\n口腔用药',layer:'clinical',r:22,category:'special'},
-  {id:'慢病\n管理',layer:'service',r:27,category:'service'},
+  {id:'慢性病\n管理',layer:'service',r:27,category:'service'},
   {id:'用药安全',layer:'service',r:25,category:'service'},
   {id:'处方审核\n与调剂',layer:'service',r:24,category:'service'},
   {id:'用药咨询\n与治疗管理',layer:'service',r:24,category:'service'},
   {id:'常见病症\n健康管理',layer:'service',r:24,category:'service'},
+  {id:'药学服务\n与药品管理',layer:'service',r:24,category:'service'},
+  {id:'急救、中毒\n解救及职业防护',layer:'service',r:24,category:'service'},
 ];
 
 const rawEdges=[
@@ -562,12 +566,12 @@ const rawEdges=[
   ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','main'],
   ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','main'],
   ['抗肿瘤\n药物','肿瘤','main'],
-  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢病\n管理','main'],
+  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢性病\n管理','main'],
   ['药剂学','处方审核\n与调剂','main'],['药理毒理学','用药安全','main'],
   ['生命药学','常见病症\n健康管理','main'],
   ['心血管系统\n用药','内分泌系统\n用药','net'],
-  ['心血管系统\n用药','慢病\n管理','net'],
-  ['内分泌系统\n用药','慢病\n管理','net'],
+  ['心血管系统\n用药','慢性病\n管理','net'],
+  ['内分泌系统\n用药','慢性病\n管理','net'],
   ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
   ['抗感染\n药物','呼吸系统\n常见疾病','net'],
   ['抗感染\n药物','泌尿系统\n常见疾病','net'],
@@ -575,6 +579,10 @@ const rawEdges=[
   ['抗肿瘤\n药物','用药安全','net'],
   ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
   ['用药咨询\n与治疗管理','用药安全','net'],
+  ['药学服务\n与药品管理','处方审核\n与调剂','main'],
+  ['药学服务\n与药品管理','用药安全','net'],
+  ['急救、中毒\n解救及职业防护','用药安全','main'],
+  ['急救、中毒\n解救及职业防护','处方审核\n与调剂','net'],
   // V4.1: 修复孤立节点和增强连通性
   ['药剂学','眼科耳鼻喉\n口腔用药','main'],
   ['受体','眼科耳鼻喉\n口腔用药','main'],
@@ -601,7 +609,7 @@ const CATEGORY_GROUPS={
   immuno:['抗感染\n药物','解热镇痛\n抗炎抗风湿','皮肤用药\n及抗过敏','免疫系统\n常见疾病'],
   onco:  ['抗肿瘤\n药物','肿瘤'],
   special:['眼科耳鼻喉\n口腔用药'],
-  service:['慢病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理'],
+  service:['慢性病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理','药学服务\n与药品管理','急救、中毒\n解救及职业防护'],
 };
 
 const CATEGORY_LABELS={
