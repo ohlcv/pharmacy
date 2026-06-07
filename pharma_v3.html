@@ -74,6 +74,18 @@ body{
 #header-sub-text.is-hidden{
   opacity:0;
 }
+#header-credit{
+  font-size:10px;
+  font-weight:600;
+  color:var(--text-muted);
+  letter-spacing:0.1em;
+  opacity:0.5;
+  user-select:none;
+  transition:opacity 0.15s;
+}
+#header-credit:hover{
+  opacity:0.85;
+}
 
 /* ── Search bar ── */
 #search-wrap{flex:1;max-width:260px;position:relative;}
@@ -310,6 +322,7 @@ canvas{
       <div id="header-title">药学知识拓扑图</div>
       <div id="header-sub"><span id="header-sub-text">四力引擎</span></div>
     </div>
+    <div id="header-credit">meow</div>
   </div>
 
   <div id="canvas-wrap">
