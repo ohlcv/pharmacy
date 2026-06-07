@@ -75,16 +75,28 @@ body{
   opacity:0;
 }
 #header-credit{
-  font-size:10px;
-  font-weight:600;
-  color:var(--text-muted);
-  letter-spacing:0.1em;
-  opacity:0.5;
+  display:flex;
+  align-items:baseline;
+  gap:4px;
+  font-size:11px;
   user-select:none;
-  transition:opacity 0.15s;
+  opacity:0.55;
+  transition:opacity .2s;
 }
 #header-credit:hover{
-  opacity:0.85;
+  opacity:0.9;
+}
+#header-credit .credit-by{
+  font-weight:400;
+  font-style:italic;
+  color:var(--text-muted);
+  letter-spacing:0.02em;
+}
+#header-credit .credit-name{
+  font-family:'DM Sans','Noto Sans SC',sans-serif;
+  font-weight:600;
+  color:var(--accent);
+  letter-spacing:0.06em;
 }
 
 /* ── Search bar ── */
@@ -322,7 +334,7 @@ canvas{
       <div id="header-title">药学知识拓扑图</div>
       <div id="header-sub"><span id="header-sub-text">四力引擎</span></div>
     </div>
-    <div id="header-credit">meow</div>
+    <div id="header-credit"><span class="credit-by">by</span><span class="credit-name">meow</span></div>
   </div>
 
   <div id="canvas-wrap">
